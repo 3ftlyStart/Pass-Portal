@@ -1,0 +1,7 @@
+{
+  "name": "IELTS Pass Portal",
+  "description": "A comprehensive IELTS preparation platform featuring AI-powered speaking examiners, writing feedback, and practice tests.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
