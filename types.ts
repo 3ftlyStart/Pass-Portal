@@ -18,8 +18,11 @@ export interface WritingScore {
 export interface SpeakingSession {
   id: string;
   date: string;
-  transcript: { speaker: 'Examiner' | 'Candidate', text: string }[];
+  transcript: { sender: 'Examiner' | 'You', text: string }[];
+  audioUrl?: string;
+  audioBlobId?: string; // For IndexedDB storage
   feedback?: string;
+  overallBand?: number;
 }
 
 export interface ReadingQuestion {

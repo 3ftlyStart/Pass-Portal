@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "SpeakingSession": {
+      "title": "Speaking Session",
+      "description": "A record of an IELTS Speaking mock test session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "transcript": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sender": { "type": "string", "enum": ["Examiner", "You"] },
+              "text": { "type": "string" }
+            }
+          }
+        },
+        "feedback": { "type": "string" },
+        "overallBand": { "type": "number" },
+        "audioBlobId": { "type": "string", "description": "Reference to locally stored audio in IndexedDB" }
+      },
+      "required": ["userId", "date", "transcript"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and settings.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "targetScore": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/speaking_sessions/{sessionId}": {
+      "schema": "SpeakingSession",
+      "description": "Collection of speaking sessions."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    }
+  }
+}

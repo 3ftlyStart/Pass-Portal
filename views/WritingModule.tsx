@@ -7,9 +7,9 @@ import {
   CheckCircle2, 
   ChevronDown,
   Target,
-  Shuffle,
-  Languages,
-  FileCode,
+  Link,
+  BookOpen,
+  SpellCheck,
   CheckCircle,
   Lightbulb,
   Info
@@ -26,39 +26,45 @@ interface AccordionProps {
   onToggle: () => void;
 }
 
-const AccordionItem: React.FC<AccordionProps> = ({ title, icon, children, isOpen, onToggle }) => (
-  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white mb-3 shadow-sm transition-all duration-200">
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center justify-between p-4 md:p-5 text-left hover:bg-slate-50 transition-colors"
+const AccordionItem: React.FC<AccordionProps> = ({ title, icon, children, isOpen, onToggle }) => {
+  return (
+    <motion.div 
+      layout
+      className="border border-slate-100 rounded-2xl overflow-hidden bg-white mb-3 shadow-sm transition-all duration-200"
     >
-      <div className="flex items-center gap-3 md:gap-4">
-        <div className={`p-2 rounded-lg transition-colors ${isOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-          {React.cloneElement(icon as React.ReactElement, { size: 18 })}
-        </div>
-        <span className="font-bold text-slate-800 text-sm md:text-base">{title}</span>
-      </div>
-      <ChevronDown 
-        size={18} 
-        className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} 
-      />
-    </button>
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div 
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden"
-        >
-          <div className="p-5 pt-0 border-t border-slate-50 text-slate-600 leading-relaxed text-sm">
-            {children}
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 md:p-5 text-left hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-3 md:gap-4">
+          <div className={`p-2 rounded-lg transition-colors ${isOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+            {React.cloneElement(icon as React.ReactElement, { size: 18 })}
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </div>
-);
+          <span className="font-bold text-slate-800 text-sm md:text-base">{title}</span>
+        </div>
+        <ChevronDown 
+          size={18} 
+          className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} 
+        />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+            className="overflow-hidden"
+          >
+            <div className="p-5 pt-0 border-t border-slate-50 text-slate-600 leading-relaxed text-sm">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
 
 const WritingModule: React.FC = () => {
   const [essay, setEssay] = useState('');
@@ -222,7 +228,7 @@ const WritingModule: React.FC = () => {
                 </div>
 
                 {/* Criterion Accordion */}
-                <div className="space-y-3">
+                <motion.div layout className="space-y-3">
                   <h4 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2">Scoring Breakdown</h4>
                   
                   <AccordionItem
@@ -231,36 +237,60 @@ const WritingModule: React.FC = () => {
                     isOpen={openSection === 'Task Response'}
                     onToggle={() => setOpenSection(openSection === 'Task Response' ? null : 'Task Response')}
                   >
-                    <p>{feedback.taskResponse}</p>
+                    <div className="space-y-3">
+                      <p className="font-medium text-slate-700">{feedback.taskResponse}</p>
+                      <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50">
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Examiner Focus</p>
+                        <p className="text-xs text-indigo-600/80 font-medium">Addressing all parts of the task and providing a clear position throughout the response.</p>
+                      </div>
+                    </div>
                   </AccordionItem>
 
                   <AccordionItem
-                    title="Coherence & Cohesion"
-                    icon={<Shuffle />}
+                    title="Coherence/Cohesion"
+                    icon={<Link />}
                     isOpen={openSection === 'Coherence'}
                     onToggle={() => setOpenSection(openSection === 'Coherence' ? null : 'Coherence')}
                   >
-                    <p>{feedback.coherenceCohesion}</p>
+                    <div className="space-y-3">
+                      <p className="font-medium text-slate-700">{feedback.coherenceCohesion}</p>
+                      <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Examiner Focus</p>
+                        <p className="text-xs text-blue-600/80 font-medium">Logically organizing information and ideas; using a range of cohesive devices effectively.</p>
+                      </div>
+                    </div>
                   </AccordionItem>
 
                   <AccordionItem
                     title="Lexical Resource"
-                    icon={<Languages />}
+                    icon={<BookOpen />}
                     isOpen={openSection === 'Lexical'}
                     onToggle={() => setOpenSection(openSection === 'Lexical' ? null : 'Lexical')}
                   >
-                    <p>{feedback.lexicalResource}</p>
+                    <div className="space-y-3">
+                      <p className="font-medium text-slate-700">{feedback.lexicalResource}</p>
+                      <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50">
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Examiner Focus</p>
+                        <p className="text-xs text-emerald-600/80 font-medium">Using a wide range of vocabulary with precision and awareness of style and collocation.</p>
+                      </div>
+                    </div>
                   </AccordionItem>
 
                   <AccordionItem
-                    title="Grammatical Range & Accuracy"
-                    icon={<FileCode />}
+                    title="Grammatical Range"
+                    icon={<SpellCheck />}
                     isOpen={openSection === 'Grammar'}
                     onToggle={() => setOpenSection(openSection === 'Grammar' ? null : 'Grammar')}
                   >
-                    <p>{feedback.grammaticalRange}</p>
+                    <div className="space-y-3">
+                      <p className="font-medium text-slate-700">{feedback.grammaticalRange}</p>
+                      <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Examiner Focus</p>
+                        <p className="text-xs text-amber-600/80 font-medium">Using a wide range of structures with a high degree of flexibility and accuracy.</p>
+                      </div>
+                    </div>
                   </AccordionItem>
-                </div>
+                </motion.div>
 
                 {/* Suggested Corrections */}
                 <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">

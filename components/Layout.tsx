@@ -45,9 +45,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="p-6 border-b border-slate-100 h-20 flex items-center shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-100">
-            <span className="text-white font-bold text-xl">I</span>
+            <span className="text-white font-bold text-xl">i</span>
           </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">IELTS Pass</span>
+          <span className="text-xl font-bold text-slate-800 tracking-tight">ieHuddle</span>
         </div>
       </div>
       
@@ -134,7 +134,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Menu size={24} />
             </button>
             <h1 className="text-base md:text-lg font-bold text-slate-800 truncate max-w-[150px] md:max-w-none">
-              {navItems.find(n => n.path === location.pathname)?.name || 'IELTS Pass Portal'}
+              {navItems.find(n => n.path === location.pathname)?.name || 'ieHuddle'}
             </h1>
           </div>
 
