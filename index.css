@@ -1,17 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-brand-navy: #1A365D;
+  --color-brand-teal: #38B2AC;
+  --color-brand-sky: #63B3ED;
+  --color-brand-orange-light: #F6AD55;
+  --color-brand-orange-dark: #ED8936;
 }
 
 @layer base {
   body {
-    @apply antialiased text-slate-900 bg-slate-50;
+    @apply antialiased text-slate-900 bg-slate-50 font-sans;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-brand-navy;
   }
 }
 
 @layer utilities {
   .glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+  
+  .btn-primary {
+    @apply bg-linear-to-r from-brand-orange-light to-brand-orange-dark text-white font-bold rounded-xl shadow-lg hover:shadow-brand-orange-light/20 transition-all active:scale-95;
+  }
+  
+  .card-brand {
+    @apply bg-white rounded-2xl border border-slate-100 shadow-xl shadow-brand-navy/5;
   }
 }

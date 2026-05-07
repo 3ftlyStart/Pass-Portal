@@ -12,11 +12,14 @@ import {
   Settings,
   Menu,
   X,
-  Target as TargetIcon
+  Target as TargetIcon,
+  User,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../context/AuthContext';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,7 +27,9 @@ function cn(...inputs: ClassValue[]) {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Close sidebar on route change
   useEffect(() => {
@@ -40,14 +45,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Mock Tests', path: '/mock-tests', icon: GraduationCap },
   ];
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
   const SidebarContent = () => (
     <>
       <div className="p-6 border-b border-slate-100 h-20 flex items-center shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-100">
-            <span className="text-white font-bold text-xl">i</span>
+          <div className="w-10 h-10 bg-brand-navy rounded-lg flex items-center justify-center shadow-lg shadow-brand-navy/10 group">
+            <span className="text-white font-bold text-xl transition-transform group-hover:scale-110">i</span>
           </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">ieHuddle</span>
+          <span className="text-xl font-bold text-brand-navy tracking-tight">ieHuddle</span>
         </div>
       </div>
       
@@ -62,24 +75,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-sm md:text-base",
                 isActive 
-                  ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-100' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
+                  ? 'bg-brand-navy text-white font-semibold shadow-md shadow-brand-navy/20' 
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-brand-navy'
               )}
             >
-              <Icon size={isActive ? 20 : 18} className={cn("transition-colors", isActive ? "text-white" : "group-hover:text-indigo-600")} />
+              <Icon size={isActive ? 20 : 18} className={cn("transition-colors", isActive ? "text-white" : "group-hover:text-brand-navy")} />
               {item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-        <Link to="/history" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-indigo-600 rounded-xl transition-all group">
-          <History size={18} className="group-hover:text-indigo-600" />
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-brand-navy">
+        <Link to="/history" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-brand-navy rounded-xl transition-all group">
+          <History size={18} className="group-hover:text-brand-navy" />
           History
         </Link>
-        <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-indigo-600 rounded-xl transition-all group">
-          <Settings size={18} className="group-hover:text-indigo-600" />
+        <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-brand-navy rounded-xl transition-all group">
+          <Settings size={18} className="group-hover:text-brand-navy" />
           Settings
         </Link>
       </div>
@@ -133,32 +146,76 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-base md:text-lg font-bold text-slate-800 truncate max-w-[150px] md:max-w-none">
+            <h1 className="text-base md:text-lg font-bold text-brand-navy truncate max-w-[150px] md:max-w-none">
               {navItems.find(n => n.path === location.pathname)?.name || 'ieHuddle'}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="hidden sm:flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100/50">
-              <TargetIcon size={14} className="text-indigo-600" />
-              <span className="text-xs font-bold text-indigo-700">8.0</span>
+          <div className="flex items-center gap-2 md:gap-4 relative">
+            <div className="hidden sm:flex items-center gap-2 bg-brand-sky/10 px-3 py-1.5 rounded-full border border-brand-sky/20">
+              <TargetIcon size={14} className="text-brand-sky" />
+              <span className="text-xs font-bold text-brand-navy">8.0</span>
             </div>
             
             <motion.div 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-2 cursor-pointer p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors"
             >
               <img 
-                src="https://picsum.photos/seed/user1/64/64" 
+                src={user?.photoURL || "https://picsum.photos/seed/user1/64/64"} 
                 alt="Avatar" 
                 className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100"
               />
               <div className="hidden md:block">
-                <p className="text-xs font-bold text-slate-800">Noel M.</p>
+                <p className="text-xs font-bold text-slate-800">{user?.displayName || 'User'}</p>
                 <p className="text-[10px] text-slate-400 font-medium">Standard Plan</p>
               </div>
             </motion.div>
+
+            {/* User Menu Popover */}
+            <AnimatePresence>
+              {isUserMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsUserMenuOpen(false)} 
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 overflow-hidden"
+                  >
+                    <div className="px-4 py-3 border-b border-slate-50 md:hidden">
+                      <p className="text-sm font-bold text-slate-800">{user?.displayName || 'User'}</p>
+                      <p className="text-xs text-slate-400">Standard Plan</p>
+                    </div>
+                    <div className="p-1">
+                      <button 
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-brand-sky/10 hover:text-brand-navy rounded-xl transition-all group"
+                      >
+                        <User size={18} className="text-slate-400 group-hover:text-brand-navy" />
+                        Account Settings
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-xl transition-all group"
+                      >
+                        <LogOut size={18} className="text-rose-400 group-hover:text-rose-600" />
+                        Logout
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </header>
         
