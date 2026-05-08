@@ -13,12 +13,17 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
+      // Auth tokens NEVER contain custom claims in this env. Check DB.
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -42,33 +47,38 @@ service cloud.firestore {
           && data.role in ['admin', 'teacher', 'student']
           && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 100)
           && (data.get('targetScore', 7.5) is number && data.get('targetScore', 7.5) >= 0 && data.get('targetScore', 7.5) <= 9)
-          && data.createdAt is timestamp;
+          && data.createdAt == request.time;
     }
 
     function isValidSpeakingSession(data) {
       return data.userId == request.auth.uid
           && data.date is timestamp
-          && data.transcript is list;
+          && data.transcript is list
+          && (data.get('overallBand', 0) is number);
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
+      
+      // We don't allow listing all users unless admin
       allow list: if isAdmin();
 
       allow create: if isOwner(userId) 
                     && isValidUser(incoming())
-                    && incoming().role == 'student';
+                    && incoming().role == 'student'; // Default role on self-signup
 
       allow update: if isOwner(userId)
                     && (
-                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'targetScore', 'updatedAt', 'role'])
-                      && (incoming().get('updatedAt', request.time) is timestamp)
-                      && (incoming().get('role', existing().role) in ['admin', 'teacher', 'student'])
-                      && (incoming().get('displayName', existing().get('displayName', '')) is string)
-                      && (incoming().get('targetScore', existing().get('targetScore', 7.5)) is number)
+                      // Users can update their profile but NOT their role
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'targetScore', 'updatedAt'])
+                      && incoming().updatedAt == request.time
+                      && incoming().role == existing().role
+                      && (incoming().get('displayName', '') is string && incoming().get('displayName', '').size() <= 100)
+                      && (incoming().get('targetScore', 7.5) is number && incoming().get('targetScore', 7.5) >= 0 && incoming().get('targetScore', 7.5) <= 9)
                     ) || (
+                      // Admins can update everything including role
                       isAdmin()
                     );
       
@@ -77,12 +87,15 @@ service cloud.firestore {
 
     match /speaking_sessions/{sessionId} {
       allow get: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
+      
+      // Secure list query
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
 
-      allow create: if isSignedIn() && isValidSpeakingSession(incoming());
+      allow create: if isSignedIn() && isValidSpeakingSession(incoming()) && isValidId(sessionId);
 
       allow update: if isSignedIn() && (isOwner(existing().userId) || isAdmin())
                     && (
+                      // Only allow updating specific fields
                       incoming().diff(existing()).affectedKeys().hasOnly(['transcript', 'feedback', 'overallBand', 'updatedAt'])
                     );
       

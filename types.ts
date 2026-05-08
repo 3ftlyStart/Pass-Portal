@@ -6,6 +6,19 @@ export enum ModuleType {
   SPEAKING = 'Speaking'
 }
 
+export type UserRole = 'admin' | 'teacher' | 'student';
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  role: UserRole;
+  targetScore?: number;
+  createdAt: any;
+  updatedAt: any;
+}
+
 export interface WritingScore {
   overallBand: number;
   taskResponse: string;

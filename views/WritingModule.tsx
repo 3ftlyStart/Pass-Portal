@@ -37,10 +37,10 @@ const AccordionItem: React.FC<AccordionProps> = ({ title, icon, children, isOpen
         className="w-full flex items-center justify-between p-4 md:p-5 text-left hover:bg-slate-50 transition-colors"
       >
         <div className="flex items-center gap-3 md:gap-4">
-          <div className={`p-2 rounded-lg transition-colors ${isOpen ? 'bg-brand-navy text-white' : 'bg-slate-100 text-slate-500'}`}>
+          <div className={`p-2 rounded-lg transition-colors ${isOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
             {React.cloneElement(icon as React.ReactElement, { size: 18 })}
           </div>
-          <span className="font-bold text-brand-navy text-sm md:text-base">{title}</span>
+          <span className="font-bold text-slate-800 text-sm md:text-base font-heading">{title}</span>
         </div>
         <ChevronDown 
           size={18} 
@@ -109,20 +109,20 @@ const WritingModule: React.FC = () => {
           <motion.div 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="card-brand p-5 md:p-8"
+            className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-slate-100"
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-brand-sky/10 p-2 rounded-lg text-brand-sky">
+              <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
                 <PenTool size={18} />
               </div>
-              <h2 className="text-lg md:text-xl font-bold text-brand-navy">Question</h2>
+              <h2 className="text-lg md:text-xl font-bold text-slate-800 font-heading">Question</h2>
             </div>
-            <p className="text-sm md:text-base text-slate-700 leading-relaxed font-bold mb-4">
+            <p className="text-sm md:text-base text-slate-700 leading-relaxed font-medium mb-4">
               {currentTask.prompt}
             </p>
-            <div className="flex items-center justify-between text-[10px] md:text-xs text-slate-400 font-black uppercase tracking-widest border-t border-slate-100 pt-4">
-              <span>Time: 40 mins</span>
-              <span>Requirements: {currentTask.wordCount}</span>
+            <div className="flex items-center justify-between text-[10px] md:text-xs text-slate-400 font-bold uppercase tracking-widest border-t border-slate-100 pt-4">
+              <span>40 mins</span>
+              <span>{currentTask.wordCount}</span>
             </div>
           </motion.div>
 
@@ -141,15 +141,15 @@ const WritingModule: React.FC = () => {
             ></textarea>
             <div className="bg-slate-50 px-5 md:px-8 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <span className={`text-xs md:text-sm font-bold ${wordCount < 250 ? 'text-brand-orange-dark' : 'text-brand-teal'}`}>
+                <span className={`text-xs md:text-sm font-bold ${wordCount < 250 ? 'text-amber-600' : 'text-emerald-600'}`}>
                   Words: {wordCount} / 250
                 </span>
-                {wordCount >= 250 && <CheckCircle2 size={16} className="text-brand-teal" />}
+                {wordCount >= 250 && <CheckCircle2 size={16} className="text-emerald-600" />}
               </div>
               <button
                 onClick={handleSubmit}
                 disabled={loading || wordCount < 50}
-                className="w-full sm:w-auto bg-linear-to-r from-brand-orange-light to-brand-orange-dark text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-xl hover:shadow-brand-orange-light/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95"
+                className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-100 active:scale-95"
               >
                 {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={16} />}
                 Evaluate Essay
@@ -172,7 +172,7 @@ const WritingModule: React.FC = () => {
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mb-6">
                   <PenTool size={32} />
                 </div>
-                <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-2 tracking-tight">Ready for Review?</h3>
+                <h3 className="text-lg md:text-xl font-bold text-slate-800 mb-2 tracking-tight font-heading">Ready for Review?</h3>
                 <p className="text-xs md:text-sm text-slate-400 max-w-sm leading-relaxed font-medium">Write at least 50 words to receive a comprehensive band score and detailed feedback.</p>
               </motion.div>
             )}
@@ -195,7 +195,7 @@ const WritingModule: React.FC = () => {
                     <PenTool size={24} />
                   </div>
                 </div>
-                <h3 className="text-xl md:text-2xl font-black text-slate-800 mb-2">AI Examiner at Work</h3>
+                <h3 className="text-xl md:text-2xl font-black text-slate-800 mb-2 font-heading">AI Examiner at Work</h3>
                 <p className="text-xs md:text-sm text-slate-400 max-w-xs leading-relaxed font-medium px-4">Analyzing structure, vocabulary, and grammar against official IELTS standards...</p>
               </motion.div>
             )}
@@ -208,20 +208,20 @@ const WritingModule: React.FC = () => {
                 className="space-y-6"
               >
                 {/* Score Hero Card */}
-                <div className="bg-brand-navy p-6 md:p-8 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
+                <div className="bg-indigo-600 p-6 md:p-8 rounded-[2rem] shadow-xl text-white relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 md:p-8 opacity-5">
                     <CheckCircle size={100} className="md:w-32 md:h-32" />
                   </div>
                   <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                     <div>
-                      <h3 className="text-brand-sky font-bold uppercase tracking-widest text-[10px] md:text-xs mb-1">Estimated Band Score</h3>
+                      <h3 className="text-indigo-200 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-1">Estimated Band Score</h3>
                       <div className="flex items-baseline gap-2">
                         <span className="text-5xl md:text-6xl font-black tracking-tighter">{feedback.overallBand}</span>
-                        <span className="text-lg md:text-xl font-bold text-slate-400">/ 9.0</span>
+                        <span className="text-lg md:text-xl font-bold text-indigo-300">/ 9.0</span>
                       </div>
                     </div>
                     <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 md:p-5 border border-white/10">
-                      <p className="text-[10px] md:text-xs text-brand-sky mb-1 font-bold uppercase">Analysis Date</p>
+                      <p className="text-[10px] md:text-xs text-indigo-200 mb-1 font-bold uppercase">Analysis Date</p>
                       <p className="text-sm md:text-base font-bold">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                     </div>
                   </div>
@@ -229,7 +229,7 @@ const WritingModule: React.FC = () => {
 
                 {/* Criterion Accordion */}
                 <motion.div layout className="space-y-3">
-                  <h4 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2">Scoring Breakdown</h4>
+                  <h4 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2 font-heading">Scoring Breakdown</h4>
                   
                   <AccordionItem
                     title="Task Response"
@@ -298,7 +298,7 @@ const WritingModule: React.FC = () => {
                     <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600">
                       <CheckCircle2 size={18} />
                     </div>
-                    <h4 className="text-base md:text-lg font-bold text-slate-800 tracking-tight">Key Improvements</h4>
+                    <h4 className="text-base md:text-lg font-bold text-slate-800 tracking-tight font-heading">Key Improvements</h4>
                   </div>
                   <div className="space-y-3">
                     {feedback.suggestedCorrections.map((correction, i) => (
@@ -318,7 +318,7 @@ const WritingModule: React.FC = () => {
                     <div className="bg-amber-100 p-2 rounded-lg text-amber-600">
                       <Lightbulb size={18} />
                     </div>
-                    <h4 className="text-base md:text-lg font-bold text-slate-800 tracking-tight">Grammar Lab Tips</h4>
+                    <h4 className="text-base md:text-lg font-bold text-slate-800 tracking-tight font-heading">Grammar Lab Tips</h4>
                   </div>
                   <div className="space-y-3">
                     {grammarTips.map((item, index) => (

@@ -1,36 +1,39 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Iosevka+Charon+Mono:wght@400;700&family=Audiowide&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Iosevka Charon Mono", monospace;
+  --font-logo: "Audiowide", system-ui;
   
-  --color-brand-navy: #1A365D;
-  --color-brand-teal: #38B2AC;
-  --color-brand-sky: #63B3ED;
-  --color-brand-orange-light: #F6AD55;
-  --color-brand-orange-dark: #ED8936;
+  /* Brand colors inspired by the image */
+  --color-brand-teal: #6a99a8;
+  --color-brand-orange: #f1b02d;
+  --color-brand-green: #a2c04d;
+  --color-brand-sky: #d0e3ec;
+
+  /* Overriding indigo to automatically theme existing components */
+  --color-indigo-50: #f4f8f9;
+  --color-indigo-100: #d0e3ec;
+  --color-indigo-400: #88acc0;
+  --color-indigo-500: #6a99a8;
+  --color-indigo-600: #577f8d;
+  --color-indigo-700: #456570;
+  
+  /* Overriding some others to match green/orange from image */
+  --color-emerald-500: #a2c04d;
+  --color-orange-500: #f1b02d;
+  --color-amber-500: #f1b02d;
 }
 
 @layer base {
   body {
-    @apply antialiased text-slate-900 bg-slate-50 font-sans;
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    @apply text-brand-navy;
+    @apply antialiased text-slate-900 bg-slate-50;
   }
 }
 
 @layer utilities {
   .glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20;
-  }
-  
-  .btn-primary {
-    @apply bg-linear-to-r from-brand-orange-light to-brand-orange-dark text-white font-bold rounded-xl shadow-lg hover:shadow-brand-orange-light/20 transition-all active:scale-95;
-  }
-  
-  .card-brand {
-    @apply bg-white rounded-2xl border border-slate-100 shadow-xl shadow-brand-navy/5;
   }
 }

@@ -1,6 +1,6 @@
 {
-  "name": "ieHuddle",
-  "description": "A comprehensive IELTS preparation platform featuring AI-powered speaking examiners, writing feedback, and practice tests.",
+  "name": "ieltshub Portal",
+  "description": "ieltshub is a comprehensive IELTS preparation platform featuring AI-powered speaking examiners, writing feedback, and practice tests.",
   "requestFramePermissions": [
     "microphone"
   ]

@@ -2,7 +2,7 @@
   "entities": {
     "SpeakingSession": {
       "title": "Speaking Session",
-      "description": "A record of an IELTS Speaking mock test session.",
+      "description": "A record of an ieltshub Speaking mock test session.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -29,10 +29,14 @@
       "type": "object",
       "properties": {
         "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
         "targetScore": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["email", "createdAt"]
+      "required": ["email", "role", "createdAt"]
     }
   },
   "firestore": {

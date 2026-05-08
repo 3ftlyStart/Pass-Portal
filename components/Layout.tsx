@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -13,27 +13,31 @@ import {
   Menu,
   X,
   Target as TargetIcon,
-  User,
-  LogOut
+  LogOut,
+  User as UserIcon,
+  Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../context/AuthContext';
+import { Brand } from './Brand';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout: React.FC = () => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user, profile, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Close sidebar on route change
   useEffect(() => {
     setIsSidebarOpen(false);
+    setIsUserMenuOpen(false);
   }, [location.pathname]);
 
   const navItems = [
@@ -46,28 +50,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ];
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
+    await logout();
+    navigate('/login');
   };
 
   const SidebarContent = () => (
     <>
-      <div className="p-6 border-b border-slate-100 h-20 flex items-center shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-brand-navy rounded-lg flex items-center justify-center shadow-lg shadow-brand-navy/10 group">
-            <span className="text-white font-bold text-xl transition-transform group-hover:scale-110">i</span>
-          </div>
-          <span className="text-xl font-bold text-brand-navy tracking-tight">ieHuddle</span>
-        </div>
+      <div className="p-6 border-b border-slate-100 h-24 flex items-center shrink-0">
+        <Link to="/">
+          <Brand size={40} variant="primary" />
+        </Link>
       </div>
       
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto pt-6">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
           return (
             <Link
               key={item.name}
@@ -75,25 +73,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-sm md:text-base",
                 isActive 
-                  ? 'bg-brand-navy text-white font-semibold shadow-md shadow-brand-navy/20' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-brand-navy'
+                  ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-100' 
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
               )}
             >
-              <Icon size={isActive ? 20 : 18} className={cn("transition-colors", isActive ? "text-white" : "group-hover:text-brand-navy")} />
+              <Icon size={isActive ? 20 : 18} className={cn("transition-colors", isActive ? "text-white" : "group-hover:text-indigo-600")} />
               {item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-brand-navy">
-        <Link to="/history" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-brand-navy rounded-xl transition-all group">
-          <History size={18} className="group-hover:text-brand-navy" />
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+        <Link to="/history" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-indigo-600 rounded-xl transition-all group">
+          <History size={18} className="group-hover:text-indigo-600" />
           History
         </Link>
-        <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-brand-navy rounded-xl transition-all group">
-          <Settings size={18} className="group-hover:text-brand-navy" />
-          Settings
+        <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-white hover:text-indigo-600 rounded-xl transition-all group">
+          <Settings size={18} className="group-hover:text-indigo-600" />
+          Profile Settings
         </Link>
       </div>
     </>
@@ -146,82 +144,88 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-base md:text-lg font-bold text-brand-navy truncate max-w-[150px] md:max-w-none">
-              {navItems.find(n => n.path === location.pathname)?.name || 'ieHuddle'}
+            <h1 className="text-base md:text-lg font-bold text-slate-800 truncate max-w-[150px] md:max-w-none font-heading">
+              {navItems.find(n => location.pathname === n.path || (n.path !== '/' && location.pathname.startsWith(n.path)))?.name || 'Portal'}
             </h1>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 relative">
-            <div className="hidden sm:flex items-center gap-2 bg-brand-sky/10 px-3 py-1.5 rounded-full border border-brand-sky/20">
-              <TargetIcon size={14} className="text-brand-sky" />
-              <span className="text-xs font-bold text-brand-navy">8.0</span>
-            </div>
-            
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 cursor-pointer p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors"
-            >
-              <img 
-                src={user?.photoURL || "https://picsum.photos/seed/user1/64/64"} 
-                alt="Avatar" 
-                className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100"
-              />
-              <div className="hidden md:block">
-                <p className="text-xs font-bold text-slate-800">{user?.displayName || 'User'}</p>
-                <p className="text-[10px] text-slate-400 font-medium">Standard Plan</p>
+            {profile?.targetScore && (
+              <div className="hidden sm:flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100/50">
+                <TargetIcon size={14} className="text-orange-500" />
+                <span className="text-xs font-bold text-orange-600">{profile.targetScore.toFixed(1)}</span>
               </div>
-            </motion.div>
+            )}
+            
+            <div className="relative">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center gap-2 cursor-pointer p-1 pr-1 md:pr-3 rounded-full hover:bg-slate-50 transition-colors"
+              >
+                <img 
+                  src={profile?.photoURL || user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || 'User')}&background=random`} 
+                  alt="Avatar" 
+                  className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100 object-cover"
+                />
+                <div className="hidden md:block">
+                  <p className="text-xs font-bold text-slate-800 truncate max-w-[100px] font-heading">
+                    {profile?.displayName || user?.displayName || 'Member'}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium capitalize flex items-center gap-1">
+                    {profile?.role === 'admin' && <Crown size={10} className="text-amber-500" />}
+                    {profile?.role === 'teacher' && 'Teacher'}
+                    {profile?.role === 'student' && 'Student'}
+                    {!profile?.role && 'Basic Plan'}
+                  </p>
+                </div>
+              </motion.div>
 
-            {/* User Menu Popover */}
-            <AnimatePresence>
-              {isUserMenuOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setIsUserMenuOpen(false)} 
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 overflow-hidden"
-                  >
-                    <div className="px-4 py-3 border-b border-slate-50 md:hidden">
-                      <p className="text-sm font-bold text-slate-800">{user?.displayName || 'User'}</p>
-                      <p className="text-xs text-slate-400">Standard Plan</p>
-                    </div>
-                    <div className="p-1">
-                      <button 
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-brand-sky/10 hover:text-brand-navy rounded-xl transition-all group"
+              <AnimatePresence>
+                {isUserMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsUserMenuOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden z-50 py-2"
+                    >
+                      <div className="px-4 py-3 border-b border-slate-50 mb-1">
+                        <p className="text-sm font-bold text-slate-800 truncate font-heading">{profile?.displayName || user?.displayName}</p>
+                        <p className="text-xs text-slate-400 truncate">{profile?.email || user?.email}</p>
+                      </div>
+                      
+                      <Link 
+                        to="/profile" 
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                       >
-                        <User size={18} className="text-slate-400 group-hover:text-brand-navy" />
-                        Account Settings
-                      </button>
+                        <UserIcon size={16} />
+                        Profile Settings
+                      </Link>
+                      
                       <button 
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-xl transition-all group"
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-slate-50 mt-1"
                       >
-                        <LogOut size={18} className="text-rose-400 group-hover:text-rose-600" />
-                        Logout
+                        <LogOut size={16} />
+                        Sign Out
                       </button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </header>
         
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto h-full">
-            {children}
+            <Outlet />
           </div>
         </div>
       </main>

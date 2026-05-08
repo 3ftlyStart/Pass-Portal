@@ -50,16 +50,16 @@ const ReadingModule: React.FC = () => {
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-12 items-start">
         {/* Left Side: Passage */}
-        <div className="card-brand p-6 md:p-10 lg:sticky lg:top-24 lg:max-h-[calc(100vh-160px)] flex flex-col transition-all">
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-slate-100 overflow-hidden lg:sticky lg:top-24 lg:max-h-[calc(100vh-160px)] flex flex-col transition-all">
           <div className="flex items-center gap-3 mb-4 md:mb-6 shrink-0">
-            <BookOpen className="text-brand-navy" size={20} md:size={24} />
-            <h2 className="text-xl md:text-2xl font-black text-brand-navy tracking-tight">Reading Passage</h2>
+            <BookOpen className="text-indigo-600" size={24} />
+            <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight font-heading">Reading Passage</h2>
           </div>
-          <div className="overflow-y-auto lg:pr-4 space-y-4 md:space-y-6 scrollbar-thin scrollbar-thumb-slate-100">
-            <h3 className="text-lg md:text-xl font-bold text-brand-navy underline underline-offset-8 decoration-brand-sky/30 leading-tight">
+          <div className="overflow-y-auto lg:pr-4 space-y-4 md:space-y-6">
+            <h3 className="text-lg md:text-xl font-bold text-indigo-700 underline underline-offset-8 decoration-indigo-200 leading-tight font-heading">
               {MOCK_PASSAGE.title}
             </h3>
-            <div className="text-slate-600 md:text-slate-700 leading-relaxed md:leading-loose text-base md:text-lg whitespace-pre-wrap font-bold">
+            <div className="text-slate-600 md:text-slate-700 leading-relaxed md:leading-loose text-base md:text-lg whitespace-pre-wrap font-medium">
               {MOCK_PASSAGE.content}
             </div>
           </div>
@@ -67,11 +67,11 @@ const ReadingModule: React.FC = () => {
 
         {/* Right Side: Questions */}
         <div className="space-y-6 md:space-y-8">
-          <div className="card-brand p-6 md:p-8">
+          <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6 md:mb-8">
-              <h2 className="text-lg md:text-xl font-bold text-brand-navy tracking-tight">Questions 1-3</h2>
-              <div className="bg-brand-sky/10 px-3 py-1.5 rounded-xl text-[10px] md:text-xs font-black text-brand-navy uppercase tracking-widest flex items-center gap-2 border border-brand-sky/20">
-                <span className="w-1.5 h-1.5 bg-brand-sky rounded-full"></span>
+              <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight font-heading">Questions 1-3</h2>
+              <div className="bg-indigo-50 px-3 py-1.5 rounded-xl text-[10px] md:text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border border-indigo-100/50">
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
                 Multiple Choice
               </div>
             </div>
@@ -79,8 +79,8 @@ const ReadingModule: React.FC = () => {
             <div className="space-y-8 md:space-y-10">
               {MOCK_PASSAGE.questions.map((q, idx) => (
                 <div key={q.id} className="space-y-4">
-                  <p className="text-base md:text-lg font-bold text-brand-navy flex gap-3">
-                    <span className="bg-slate-50 border border-slate-100 w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0 font-black">{q.id}</span>
+                  <p className="text-base md:text-lg font-bold text-slate-800 flex gap-3">
+                    <span className="bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0 font-black">{q.id}</span>
                     {q.text}
                   </p>
                   <div className="grid grid-cols-1 gap-2.5 md:ml-11">
@@ -95,15 +95,15 @@ const ReadingModule: React.FC = () => {
                           onClick={() => handleSelect(q.id, opt)}
                           disabled={submitted}
                           className={`text-left p-4 rounded-xl border-2 transition-all flex justify-between items-center text-sm md:text-base ${
-                            isSelected && !submitted ? 'border-brand-teal bg-brand-teal/5 text-brand-teal font-black' : 
+                            isSelected && !submitted ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold' : 
                             isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-black' :
-                            isWrong ? 'border-brand-orange-dark bg-brand-orange-light/10 text-brand-orange-dark font-black' :
-                            'border-slate-50 hover:border-brand-sky/20 text-slate-600 font-bold'
+                            isWrong ? 'border-rose-500 bg-rose-50 text-rose-700 font-black' :
+                            'border-slate-50 hover:border-slate-200 text-slate-600'
                           }`}
                         >
                           <span className="flex-1 pr-4">{opt}</span>
                           {isCorrect && <CheckCircle size={18} className="text-emerald-600 shrink-0" />}
-                          {isWrong && <AlertCircle size={18} className="text-brand-orange-dark shrink-0" />}
+                          {isWrong && <AlertCircle size={18} className="text-rose-600 shrink-0" />}
                         </button>
                       );
                     })}
@@ -121,7 +121,7 @@ const ReadingModule: React.FC = () => {
                     exit={{ opacity: 0 }}
                     onClick={() => setSubmitted(true)}
                     disabled={Object.keys(answers).length < MOCK_PASSAGE.questions.length}
-                    className="w-full bg-linear-to-r from-brand-orange-light to-brand-orange-dark text-white py-4 md:py-5 rounded-2xl font-black text-lg hover:shadow-xl hover:shadow-brand-orange-light/20 transition-all disabled:opacity-50 shadow-lg active:scale-95"
+                    className="w-full bg-indigo-600 text-white py-4 md:py-5 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-xl shadow-indigo-100 active:scale-95"
                   >
                     Submit Answers
                   </motion.button>
@@ -129,11 +129,11 @@ const ReadingModule: React.FC = () => {
                   <motion.div 
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="p-6 md:p-8 bg-brand-navy rounded-[2rem] text-white text-center shadow-2xl shadow-brand-navy/20"
+                    className="p-6 md:p-8 bg-indigo-600 rounded-[2rem] text-white text-center shadow-2xl shadow-indigo-200"
                   >
-                    <p className="text-brand-sky text-[10px] md:text-xs font-black uppercase tracking-[0.2em] mb-2">Final Performance</p>
+                    <p className="text-indigo-200 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] mb-2">Final Performance</p>
                     <p className="text-5xl md:text-6xl font-black mb-4 tracking-tighter">{calculateScore()} <span className="text-2xl md:text-3xl opacity-50 font-bold">/ {MOCK_PASSAGE.questions.length}</span></p>
-                    <p className="font-bold text-sm md:text-base opacity-90 leading-tight">Estimated Reading Band: <span className="text-brand-teal">{calculateScore() === 3 ? '9.0' : '6.5'}</span></p>
+                    <p className="font-bold text-sm md:text-base opacity-90 leading-tight">Estimated Reading Band: <span className="text-emerald-400">{calculateScore() === 3 ? '9.0' : '6.5'}</span></p>
                     <button 
                       onClick={() => { setAnswers({}); setSubmitted(false); }}
                       className="mt-6 md:mt-8 bg-white/10 hover:bg-white/20 px-8 py-2.5 rounded-full font-bold text-sm transition-all border border-white/20 active:scale-95"

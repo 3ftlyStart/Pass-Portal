@@ -43,8 +43,6 @@ const SpeakingModule: React.FC = () => {
   const [isHistoryPlaying, setIsHistoryPlaying] = useState(false);
   const [playTime, setPlayTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isExaminerSpeaking, setIsExaminerSpeaking] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Audio recording refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -157,13 +155,6 @@ const SpeakingModule: React.FC = () => {
           
           processor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
-            
-            // Check for significant audio input to show "Transcribing" pulse
-            const rms = Math.sqrt(inputData.reduce((acc, val) => acc + val * val, 0) / inputData.length);
-            if (rms > 0.01) {
-              setIsTranscribing(true);
-            }
-
             const l = inputData.length;
             const int16 = new Int16Array(l);
             for (let i = 0; i < l; i++) {
@@ -190,7 +181,6 @@ const SpeakingModule: React.FC = () => {
             const text = msg.serverContent.inputAudioTranscription.text;
             if (text) {
               setTranscript(prev => [...prev, { sender: 'You', text }]);
-              setIsTranscribing(false);
             }
           }
 
@@ -206,14 +196,6 @@ const SpeakingModule: React.FC = () => {
                source.start(nextStartTimeRef.current);
                nextStartTimeRef.current += buffer.duration;
                sourcesRef.current.add(source);
-               
-               setIsExaminerSpeaking(true);
-               source.onended = () => {
-                 sourcesRef.current.delete(source);
-                 if (sourcesRef.current.size === 0) {
-                   setIsExaminerSpeaking(false);
-                 }
-               };
              }
 
              // Handle Model's text part (transcription)
@@ -322,17 +304,17 @@ const SpeakingModule: React.FC = () => {
   if (!user && !isActive) {
     return (
       <div className="max-w-xl mx-auto py-20 text-center space-y-8">
-        <div className="w-24 h-24 bg-brand-sky/10 rounded-full flex items-center justify-center mx-auto text-brand-sky mb-6">
+        <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-600 mb-6">
           <Lock size={40} />
         </div>
-        <h2 className="text-3xl font-black text-brand-navy">Secure Your Progress</h2>
-        <p className="text-slate-500 font-bold px-10 leading-relaxed">Sign in with ieHuddle to record your speaking mock tests, save transcripts, and track your performance over time.</p>
+        <h2 className="text-3xl font-black text-slate-800 font-heading">Secure Your Progress</h2>
+        <p className="text-slate-500 font-medium px-10">Sign in to record your speaking mock tests, save transcripts, and track your performance over time.</p>
         <button
           onClick={signInWithGoogle}
-          className="bg-white border-2 border-slate-100 px-8 py-4 rounded-2xl font-bold flex items-center gap-3 mx-auto hover:bg-slate-50 transition-all shadow-sm hover:border-brand-teal/20"
+          className="bg-white border-2 border-slate-100 px-8 py-4 rounded-2xl font-bold flex items-center gap-3 mx-auto hover:bg-slate-50 transition-all shadow-sm"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" referrerPolicy="no-referrer" />
-          <span className="text-brand-navy">Sign in with Google</span>
+          Sign in with Google
         </button>
       </div>
     );
@@ -346,23 +328,23 @@ const SpeakingModule: React.FC = () => {
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className={`card-brand p-8 md:p-12 text-center space-y-8 relative overflow-hidden transition-all duration-700 ${isActive ? 'ring-4 ring-brand-sky/10 border-brand-sky/20' : ''}`}
+            className={`bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-slate-100 text-center space-y-8 relative overflow-hidden transition-all duration-700 ${isActive ? 'ring-4 ring-indigo-50 border-indigo-100' : ''}`}
           >
             <AnimatePresence>
               {isActive && (
                 <motion.div 
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   exit={{ opacity: 0 }}
-                   className="absolute inset-0 bg-brand-sky/[0.02] animate-pulse pointer-events-none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-indigo-50/20 animate-pulse pointer-events-none"
                 />
               )}
             </AnimatePresence>
 
             <div className="relative z-10">
               <div className="mb-8">
-                <h2 className="text-3xl font-black text-brand-navy mb-3 tracking-tight">Speaking Lab</h2>
-                <p className="text-slate-500 font-bold">Recordings will be saved automatically with full AI feedback</p>
+                <h2 className="text-3xl font-black text-slate-800 mb-3 tracking-tight font-heading">Speaking Lab</h2>
+                <p className="text-slate-500 font-medium">Recordings will be saved automatically with full AI feedback</p>
               </div>
 
               <div className="flex justify-center mb-12">
@@ -370,20 +352,12 @@ const SpeakingModule: React.FC = () => {
                   <motion.div 
                     animate={isActive ? { scale: [1, 1.05, 1], rotate: [0, 1, -1, 0] } : {}}
                     transition={{ duration: 2, repeat: Infinity }}
-                    className={`w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-inner relative ${
-                      isActive ? 'bg-brand-navy shadow-2xl shadow-brand-navy/20' : 'bg-slate-50'
+                    className={`w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-inner ${
+                      isActive ? 'bg-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50'
                     }`}
                   >
-                    {isActive && isExaminerSpeaking && (
-                      <motion.div 
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="absolute inset-0 bg-brand-sky/30 rounded-full"
-                      />
-                    )}
                     {isActive ? (
-                      <Bot size={64} className="text-white md:w-20 md:h-20 relative z-10" />
+                      <Bot size={64} className="text-white md:w-20 md:h-20" />
                     ) : (
                       <User size={64} className="text-slate-200 md:w-20 md:h-20" />
                     )}
@@ -392,20 +366,9 @@ const SpeakingModule: React.FC = () => {
                     <motion.div 
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className={`absolute -bottom-1 -right-1 p-4 rounded-full border-8 border-white text-white shadow-xl transition-colors duration-300 ${
-                        isTranscribing ? 'bg-brand-orange-dark' : 'bg-brand-teal'
-                      }`}
+                      className="absolute -bottom-1 -right-1 bg-green-500 p-4 rounded-full border-8 border-white text-white shadow-xl"
                     >
-                      {isTranscribing ? (
-                        <motion.div
-                          animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                        >
-                          <Mic size={24} className="md:w-8 md:h-8" />
-                        </motion.div>
-                      ) : (
-                        <Volume2 size={24} className="md:w-8 md:h-8" />
-                      )}
+                      <Volume2 size={24} className="md:w-8 md:h-8" />
                     </motion.div>
                   )}
                 </div>
@@ -419,7 +382,7 @@ const SpeakingModule: React.FC = () => {
                       whileTap={{ scale: 0.98 }}
                       onClick={startSession}
                       disabled={isSaving}
-                      className="bg-linear-to-r from-brand-orange-light to-brand-orange-dark text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-brand-orange-light/20 hover:shadow-brand-orange-light/40 transition-all disabled:opacity-50"
+                      className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
                     >
                       {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Mic size={24} />}
                       {isSaving ? "Saving Session..." : "Start Interview"}
@@ -427,7 +390,7 @@ const SpeakingModule: React.FC = () => {
                     {!isActive && !isSaving && (
                       <button 
                         onClick={() => setShowHistory(!showHistory)}
-                        className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-brand-navy transition-colors uppercase tracking-[0.2em]"
+                        className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em]"
                       >
                         <History size={16} />
                         {showHistory ? "Hide History" : "View Previous Tests"}
@@ -445,32 +408,9 @@ const SpeakingModule: React.FC = () => {
                       <Square size={24} />
                       End & Save Session
                     </motion.button>
-                    <div className="flex items-center gap-3 text-brand-navy font-black uppercase tracking-widest text-xs h-6">
-                      {isExaminerSpeaking ? (
-                        <>
-                          <div className="flex gap-1 h-3 items-center">
-                            {[1, 2, 3].map(i => (
-                              <motion.div
-                                key={i}
-                                animate={{ height: [4, 12, 4] }}
-                                transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                                className="w-1 bg-brand-navy rounded-full"
-                              />
-                            ))}
-                          </div>
-                          <span>Examiner is speaking...</span>
-                        </>
-                      ) : isTranscribing ? (
-                        <>
-                          <Loader2 className="animate-spin" size={14} />
-                          <span className="text-brand-orange-dark">Processing candidate audio...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-2 h-2 bg-brand-teal rounded-full animate-ping"></div>
-                          <span>Examiner is listening...</span>
-                        </>
-                      )}
+                    <div className="flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-xs">
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></div>
+                      <span>Examiner is Participating...</span>
                     </div>
                   </div>
                 )}
@@ -483,34 +423,17 @@ const SpeakingModule: React.FC = () => {
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-100">
                {transcript.map((msg, i) => (
                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, x: msg.sender === 'You' ? 20 : -20 }}
+                    animate={{ opacity: 1, x: 0 }}
                     key={i} 
                     className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}
                  >
-                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm font-bold shadow-sm leading-relaxed ${
-                      msg.sender === 'You' 
-                        ? 'bg-brand-navy text-white rounded-tr-none' 
-                        : 'bg-white border border-slate-100 text-brand-navy rounded-tl-none'
-                    }`}>
+                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm font-medium ${msg.sender === 'You' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
                       {msg.text}
                     </div>
                  </motion.div>
                ))}
-               {isTranscribing && (
-                 <motion.div 
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   className="flex justify-end"
-                 >
-                   <div className="bg-indigo-50 text-indigo-400 p-3 rounded-2xl rounded-tr-none flex gap-1">
-                     <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1.5 h-1.5 bg-current rounded-full" />
-                     <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-current rounded-full" />
-                     <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-current rounded-full" />
-                   </div>
-                 </motion.div>
-               )}
-               {transcript.length === 0 && !isTranscribing && (
+               {transcript.length === 0 && (
                  <p className="text-center text-slate-400 font-medium italic">Begin speaking to start the interview...</p>
                )}
             </div>
@@ -525,7 +448,7 @@ const SpeakingModule: React.FC = () => {
                 { title: "Part 3: Discussion", text: "Compare and contrast your memorable event from Part 2 with a similar event from a different cultural context, encouraging deeper discussion and abstract thinking." }
               ].map((item, i) => (
                 <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-50 shadow-sm">
-                  <h4 className="font-black text-slate-800 mb-2 uppercase tracking-tight text-sm">{item.title}</h4>
+                  <h4 className="font-black text-slate-800 mb-2 uppercase tracking-tight text-sm font-heading">{item.title}</h4>
                   <p className="text-xs text-slate-500 leading-relaxed font-bold">{item.text}</p>
                 </div>
               ))}
@@ -543,7 +466,7 @@ const SpeakingModule: React.FC = () => {
               className="w-full lg:w-96 space-y-6"
             >
               <div className="flex items-center justify-between px-2">
-                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2 font-heading">
                   <TrendingUp className="text-indigo-600" size={20} />
                   Session History
                 </h3>
@@ -555,7 +478,7 @@ const SpeakingModule: React.FC = () => {
                      layoutId={session.id}
                      key={session.id} 
                      onClick={() => setSelectedSession(session)}
-                     className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group hover:shadow-md"
+                     className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group hover:shadow-md"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
@@ -654,7 +577,7 @@ const SpeakingModule: React.FC = () => {
                     <BarChart3 size={24} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Session Details</h3>
+                    <h3 className="text-2xl font-black text-slate-800 tracking-tight font-heading">Session Details</h3>
                     <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{new Date(selectedSession.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   </div>
                 </div>
@@ -669,19 +592,19 @@ const SpeakingModule: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-100">
                 {/* Score and Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-brand-navy p-8 rounded-[2rem] text-white space-y-2 shadow-xl shadow-brand-navy/10 flex flex-col justify-center items-center text-center">
-                    <Award size={40} className="mb-2 text-brand-sky" />
-                    <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80 text-brand-sky">Overall Estimated Band</p>
+                  <div className="bg-indigo-600 p-8 rounded-[2rem] text-white space-y-2 shadow-xl shadow-indigo-100 flex flex-col justify-center items-center text-center">
+                    <Award size={40} className="mb-2 text-indigo-200" />
+                    <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80 text-indigo-100">Overall Estimated Band</p>
                     <div className="text-6xl font-black">{selectedSession.overallBand}</div>
                     <p className="text-sm font-bold opacity-60">Out of 9.0</p>
                   </div>
                   
                   <div className="md:col-span-2 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-center gap-2 text-brand-sky font-black uppercase tracking-widest text-xs">
+                    <div className="flex items-center gap-2 text-indigo-600 font-black uppercase tracking-widest text-xs">
                       <TrendingUp size={16} />
                       <span>Examiner Feedback</span>
                     </div>
-                    <p className="text-brand-navy font-bold leading-relaxed italic text-lg">
+                    <p className="text-slate-600 font-medium leading-relaxed italic text-lg">
                       "{selectedSession.feedback}"
                     </p>
                   </div>
@@ -703,14 +626,14 @@ const SpeakingModule: React.FC = () => {
                         key={i} 
                         className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}
                       >
-                      <div className={`max-w-[85%] space-y-1 ${msg.sender === 'You' ? 'text-right' : 'text-left'}`}>
-                          <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${msg.sender === 'You' ? 'text-brand-teal' : 'text-slate-400'}`}>
+                        <div className={`max-w-[85%] space-y-1 ${msg.sender === 'You' ? 'text-right' : 'text-left'}`}>
+                          <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${msg.sender === 'You' ? 'text-indigo-400' : 'text-slate-400'}`}>
                             {msg.sender === 'You' ? 'Candidate (You)' : 'IELTS Examiner'}
                           </div>
-                          <div className={`p-4 md:p-5 rounded-2xl text-sm md:text-base font-bold shadow-sm leading-relaxed ${
+                          <div className={`p-4 md:p-5 rounded-2xl text-sm md:text-base font-medium shadow-sm leading-relaxed ${
                             msg.sender === 'You' 
-                              ? 'bg-brand-navy text-white rounded-tr-none' 
-                              : 'bg-white border border-slate-100 text-brand-navy rounded-tl-none'
+                              ? 'bg-indigo-600 text-white rounded-tr-none' 
+                              : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
                           }`}>
                             {msg.text}
                           </div>
@@ -729,7 +652,7 @@ const SpeakingModule: React.FC = () => {
                     className={`flex items-center gap-3 px-8 py-3.5 rounded-2xl font-black transition-all transform active:scale-95 shadow-lg ${
                       playingId === selectedSession.id && isHistoryPlaying
                         ? 'bg-rose-500 text-white shadow-rose-100'
-                        : 'bg-brand-navy text-white shadow-brand-navy/10'
+                        : 'bg-indigo-600 text-white shadow-indigo-100'
                     }`}
                   >
                     {playingId === selectedSession.id && isHistoryPlaying ? (
