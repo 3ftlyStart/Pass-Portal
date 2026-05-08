@@ -7,6 +7,7 @@ export enum ModuleType {
 }
 
 export type UserRole = 'admin' | 'teacher' | 'student';
+export type SubscriptionTier = 'free' | 'pro' | 'unlimited';
 
 export interface UserProfile {
   uid: string;
@@ -15,8 +16,19 @@ export interface UserProfile {
   photoURL: string | null;
   role: UserRole;
   targetScore?: number;
+  credits: number;
+  subscriptionTier: SubscriptionTier;
   createdAt: any;
   updatedAt: any;
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number; // positive for buy, negative for spend
+  type: 'purchase' | 'usage' | 'refund' | 'bonus';
+  module?: ModuleType;
+  description: string;
+  timestamp: any;
 }
 
 export interface WritingScore {

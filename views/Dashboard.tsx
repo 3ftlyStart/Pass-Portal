@@ -7,16 +7,21 @@ import {
   Clock,
   ArrowRight,
   PenTool,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  CreditCard,
+  Wallet
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard: React.FC = () => {
+  const { profile } = useAuth();
   const stats = [
     { label: 'Overall Band', value: '7.5', icon: Target, color: 'bg-indigo-500' },
     { label: 'Improvement', value: '+0.5', icon: TrendingUp, color: 'bg-emerald-500' },
-    { label: 'Tests Taken', value: '12', icon: Clock, color: 'bg-indigo-400' },
+    { label: 'Credits Left', value: profile?.credits?.toString() || '0', icon: Zap, color: 'bg-indigo-400' },
     { label: 'Days Active', value: '24', icon: Calendar, color: 'bg-orange-500' },
   ];
 
@@ -97,32 +102,46 @@ const Dashboard: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div>
-            <h2 className="text-lg md:text-xl font-bold text-slate-800 mb-2 font-heading">Next Milestone</h2>
-            <p className="text-slate-500 text-xs md:text-sm mb-6 leading-relaxed">You're 2 practice tests away from hitting your Target Band 8.0</p>
+        {/* Billing & Wallet Section */}
+        <motion.div variants={itemVariants} className="bg-slate-900 p-6 md:p-8 rounded-3xl shadow-xl shadow-slate-200/50 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10 -rotate-12 group-hover:rotate-0 transition-transform duration-700">
+            <Wallet size={120} className="text-indigo-400" />
+          </div>
+          
+          <div className="relative z-10">
+            <h2 className="text-xl font-black text-white mb-2 font-heading tracking-tight">Practice Wallet</h2>
+            <p className="text-slate-400 text-xs font-medium mb-6 leading-relaxed">Top up credits to unlock advanced AI examiners for Speaking and Writing modules.</p>
+            
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Balance</span>
+                <span className="text-xl font-black text-indigo-400 font-heading">{profile?.credits || 0} CR</span>
+              </div>
+              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(((profile?.credits || 0) / 150) * 100, 100)}%` }}
+                  className="h-full bg-indigo-500 rounded-full"
+                />
+              </div>
+            </div>
+
             <div className="space-y-3">
-              <Link to="/mock-tests" className="w-full h-14 flex items-center justify-between px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-[0.98]">
-                <span className="font-bold">Start Mock Test</span>
-                <ArrowRight size={20} />
-              </Link>
-              <Link to="/writing" className="w-full h-14 flex items-center justify-between px-6 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold active:scale-[0.98]">
-                <span>Practice Writing</span>
-                <PenTool size={20} />
+              <Link to="/pricing" className="w-full h-12 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
+                <CreditCard size={16} />
+                Get More Credits
               </Link>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-slate-100">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">Recommended for you</p>
-            <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
-              <div className="bg-amber-100 p-2 rounded-lg text-amber-600 shrink-0">
-                <Target size={18} />
+          
+          <div className="mt-8 pt-6 border-t border-white/5 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 shrink-0">
+                <Zap size={14} />
               </div>
-              <div>
-                <p className="text-sm font-bold text-amber-900 leading-tight mb-1">Vocabulary Boost</p>
-                <p className="text-xs text-amber-700/80 leading-relaxed font-medium">Improve your Lexical Resource with topic-specific idioms.</p>
-              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">
+                Current Plan: <span className="text-white">{profile?.subscriptionTier || 'Free'}</span>
+              </p>
             </div>
           </div>
         </motion.div>

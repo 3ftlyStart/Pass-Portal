@@ -15,8 +15,11 @@ import {
   Info
 } from 'lucide-react';
 import { evaluateWriting } from '../services/geminiService';
-import { WritingScore } from '../types';
+import { deductCredits, CREDIT_COSTS } from '../services/billingService';
+import { WritingScore, ModuleType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface AccordionProps {
   title: string;
@@ -67,6 +70,8 @@ const AccordionItem: React.FC<AccordionProps> = ({ title, icon, children, isOpen
 };
 
 const WritingModule: React.FC = () => {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const [essay, setEssay] = useState('');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<WritingScore | null>(null);
@@ -79,9 +84,22 @@ const WritingModule: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!essay || essay.length < 50) return;
+    if (!essay || essay.length < 50 || !profile) return;
+
+    // Credit check
+    const cost = CREDIT_COSTS[ModuleType.WRITING];
+    if ((profile.credits || 0) < cost) {
+      if (confirm(`You need ${cost} credits to evaluate your writing. You currently have ${profile.credits || 0}. Top up now?`)) {
+        navigate('/pricing');
+      }
+      return;
+    }
+
     setLoading(true);
     try {
+      // Deduct credits
+      await deductCredits(profile.uid, ModuleType.WRITING, 'Writing Task 2 Practice');
+
       const result = await evaluateWriting(currentTask.prompt, essay);
       setFeedback(result);
     } catch (error) {

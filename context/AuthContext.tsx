@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { auth, db, signInWithGoogle } from '../services/firebase';
-import { UserRole, UserProfile } from '../types';
+import { UserRole, UserProfile, SubscriptionTier } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -35,18 +35,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             // New user, create initial profile
             const initialProfile = {
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || '',
+              photoURL: firebaseUser.photoURL || '',
               role: 'student' as UserRole,
+              targetScore: 7.5,
+              credits: 10, // Start with 10 free credits
+              subscriptionTier: 'free' as SubscriptionTier,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             };
-            setDoc(userDocRef, initialProfile);
+            setDoc(userDocRef, initialProfile).catch(err => {
+              console.error("Initial profile creation error:", err);
+            });
           }
           setLoading(false);
         }, (error) => {
-          console.error("Profile sync error:", error);
+          console.error("Profile sync error details:", error);
           setLoading(false);
         });
 

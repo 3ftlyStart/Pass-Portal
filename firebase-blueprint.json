@@ -33,20 +33,39 @@
         "photoURL": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
         "targetScore": { "type": "number" },
+        "credits": { "type": "number", "description": "Current credit balance" },
+        "subscriptionTier": { "type": "string", "enum": ["free", "pro", "unlimited"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["email", "role", "createdAt"]
+      "required": ["email", "role", "credits", "subscriptionTier", "createdAt"]
+    },
+    "CreditTransaction": {
+      "title": "Credit Transaction",
+      "description": "History of credit usage and path purchases.",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["purchase", "usage", "refund", "bonus"] },
+        "module": { "type": "string", "enum": ["Listening", "Reading", "Writing", "Speaking"] },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amount", "type", "description", "timestamp"]
     }
   },
   "firestore": {
-    "/speaking_sessions/{sessionId}": {
-      "schema": "SpeakingSession",
-      "description": "Collection of speaking sessions."
-    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles."
+    },
+    "/users/{userId}/speakingSessions/{sessionId}": {
+      "schema": "SpeakingSession",
+      "description": "Collection of speaking sessions nested under the user."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "CreditTransaction",
+      "description": "User transaction history."
     }
   }
 }

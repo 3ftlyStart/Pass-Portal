@@ -16,7 +16,9 @@ import {
   LogOut,
   User as UserIcon,
   Crown,
-  Library
+  Library,
+  Zap,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -47,6 +49,7 @@ const Layout: React.FC = () => {
     { name: 'Reading', path: '/reading', icon: BookOpen },
     { name: 'Listening', path: '/listening', icon: Headphones },
     { name: 'Practice Material', path: '/catalog', icon: Library },
+    { name: 'Plans & Pricing', path: '/pricing', icon: Zap },
     { name: 'Writing', path: '/writing', icon: PenTool },
     { name: 'Speaking', path: '/speaking', icon: Mic2 },
     { name: 'Mock Tests', path: '/mock-tests', icon: GraduationCap },
@@ -153,6 +156,49 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 relative">
+            <Link to="/pricing" className="relative group">
+              <motion.div 
+                animate={(profile?.credits || 0) < 10 ? {
+                  scale: [1, 1.05, 1],
+                  backgroundColor: ['rgba(79, 70, 229, 0.05)', 'rgba(245, 158, 11, 0.1)', 'rgba(79, 70, 229, 0.05)']
+                } : {}}
+                transition={{ duration: 2, repeat: Infinity }}
+                className={clsx(
+                  "flex items-center gap-2 px-3 py-2 rounded-full border transition-all duration-300",
+                  (profile?.credits || 0) < 10 
+                    ? "border-amber-200 bg-amber-50 shadow-sm shadow-amber-100" 
+                    : "border-indigo-100/50 bg-indigo-50 hover:bg-indigo-100/50"
+                )}
+              >
+                <div className="relative">
+                  <Zap size={14} className={clsx(
+                    (profile?.credits || 0) < 10 ? "text-amber-500 fill-amber-500" : "text-indigo-600 fill-indigo-600"
+                  )} />
+                  {(profile?.credits || 0) < 10 && (
+                    <motion.div 
+                      animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="absolute inset-0 bg-amber-400 rounded-full blur-sm"
+                    />
+                  )}
+                </div>
+                <span className={clsx(
+                  "text-xs font-black font-heading flex items-center gap-1",
+                  (profile?.credits || 0) < 10 ? "text-amber-700" : "text-indigo-700"
+                )}>
+                  {profile?.credits || 0} 
+                  <span className="text-[10px] font-bold opacity-70">CR</span>
+                </span>
+                
+                {/* Tooltip for low credits */}
+                {(profile?.credits || 0) < 10 && (
+                  <div className="absolute top-full mt-2 right-0 bg-slate-900 text-white text-[10px] font-bold py-1 px-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                    Low balance • Top up soon
+                  </div>
+                )}
+              </motion.div>
+            </Link>
+
             {profile?.targetScore && (
               <div className="hidden sm:flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100/50">
                 <TargetIcon size={14} className="text-orange-500" />
@@ -211,6 +257,14 @@ const Layout: React.FC = () => {
                         Profile Settings
                       </Link>
                       
+                      <Link 
+                        to="/pricing" 
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                      >
+                        <Wallet size={16} />
+                        Billing & Credits
+                      </Link>
+
                       <button 
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-slate-50 mt-1"

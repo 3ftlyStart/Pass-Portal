@@ -14,11 +14,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
+      // Use exists/get for role check. Note: this env does not have custom claims.
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -38,55 +43,76 @@ service cloud.firestore {
     // --- Entity Validators ---
 
     function isValidUser(data) {
+      // Basic type and size checks
       return data.email is string && data.email.size() <= 200
           && data.role in ['admin', 'teacher', 'student']
           && (data.get('displayName', '') is string && data.get('displayName', '').size() <= 100)
+          && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 2000)
           && (data.get('targetScore', 7.5) is number && data.get('targetScore', 7.5) >= 0 && data.get('targetScore', 7.5) <= 9)
-          && data.createdAt is timestamp;
+          && (data.get('credits', 0) is number && data.get('credits', 0) >= 0)
+          && (data.get('subscriptionTier', 'free') in ['free', 'pro', 'unlimited']);
+    }
+
+    function isValidTransaction(data) {
+      return data.amount is number
+          && data.type in ['purchase', 'usage', 'refund', 'bonus']
+          && data.timestamp == request.time;
     }
 
     function isValidSpeakingSession(data) {
       return data.userId == request.auth.uid
-          && data.date is timestamp
           && data.transcript is list;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
+      // Owners can see their own profile, Admins can see any
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
 
+      // Creation only for self, with email verification if preferred but at least owner check
       allow create: if isOwner(userId) 
                     && isValidUser(incoming())
-                    && incoming().role == 'student';
+                    && incoming().role == 'student'
+                    && incoming().credits == 10
+                    && incoming().subscriptionTier == 'free'
+                    && (incoming().get('createdAt', request.time) == request.time);
 
-      allow update: if isOwner(userId)
-                    && (
-                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'targetScore', 'updatedAt', 'role'])
-                      && (incoming().get('updatedAt', request.time) is timestamp)
-                      && (incoming().get('role', existing().role) in ['admin', 'teacher', 'student'])
-                      && (incoming().get('displayName', existing().get('displayName', '')) is string)
-                      && (incoming().get('targetScore', existing().get('targetScore', 7.5)) is number)
-                    ) || (
-                      isAdmin()
-                    );
+      allow update: if (isOwner(userId) && (
+                      // Strict update path for students - cannot change their own role
+                      incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'targetScore', 'updatedAt', 'credits', 'subscriptionTier'])
+                      && (incoming().get('updatedAt', request.time) == request.time)
+                      && (incoming().role == existing().role)
+                      && isValidUser(incoming())
+                    )) || isAdmin();
       
       allow delete: if isAdmin();
-    }
 
-    match /speaking_sessions/{sessionId} {
-      allow get: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // User transactions
+      match /transactions/{txId} {
+        allow get, list: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidTransaction(incoming()) && isValidId(txId);
+      }
 
-      allow create: if isSignedIn() && isValidSpeakingSession(incoming());
+      // Subcollection for sessions - Relational Sync Pattern
+      match /speakingSessions/{sessionId} {
+        allow get, list: if isOwner(userId) || isAdmin();
+        
+        allow create: if isOwner(userId) 
+                      && isValidSpeakingSession(incoming())
+                      && (incoming().get('date', request.time) == request.time)
+                      && isValidId(sessionId);
 
-      allow update: if isSignedIn() && (isOwner(existing().userId) || isAdmin())
-                    && (
-                      incoming().diff(existing()).affectedKeys().hasOnly(['transcript', 'feedback', 'overallBand', 'updatedAt'])
-                    );
-      
-      allow delete: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
+        allow update: if (isOwner(userId) && (
+                        // Fields used in saveSpeakingSession
+                        incoming().diff(existing()).affectedKeys().hasOnly(['transcript', 'feedback', 'overallBand', 'updatedAt', 'scores'])
+                        && (incoming().get('updatedAt', request.time) == request.time)
+                        && isValidSpeakingSession(incoming())
+                      )) || isAdmin();
+
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
   }
 }

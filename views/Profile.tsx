@@ -12,8 +12,15 @@ import {
   CheckCircle2, 
   Camera,
   Loader2,
-  Crown
+  Crown,
+  History,
+  Zap,
+  ArrowDownLeft,
+  ArrowUpRight
 } from 'lucide-react';
+import { db } from '../services/firebase';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { CREDIT_COSTS } from '../services/billingService';
 
 const Profile: React.FC = () => {
   const { user, profile, updateProfile } = useAuth();
@@ -22,6 +29,20 @@ const Profile: React.FC = () => {
   const [role, setRole] = useState<UserRole>(profile?.role || 'student');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'users', user.uid, 'transactions'),
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     if (profile) {
@@ -224,16 +245,72 @@ const Profile: React.FC = () => {
             </div>
           </form>
 
-          <div className="mt-8 bg-rose-50 p-8 rounded-3xl border border-rose-100">
-            <h3 className="text-lg font-bold text-rose-800 mb-2 font-heading">Danger Zone</h3>
-            <p className="text-rose-600/70 text-sm mb-6">Once you delete your account, there is no going back. Please be certain.</p>
-            <button className="px-6 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-xl text-sm font-bold hover:bg-rose-600 hover:text-white transition-all shadow-sm">
-              Delete Account
-            </button>
+            <div className="bg-rose-50 p-8 rounded-3xl border border-rose-100">
+              <h3 className="text-lg font-bold text-rose-800 mb-2 font-heading">Danger Zone</h3>
+              <p className="text-rose-600/70 text-sm mb-6">Once you delete your account, there is no going back. Please be certain.</p>
+              <button className="px-6 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-xl text-sm font-bold hover:bg-rose-600 hover:text-white transition-all shadow-sm">
+                Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Transaction History Section */}
+        <div className="mt-8 bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+          <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 font-heading">
+              <History size={20} className="text-indigo-600" />
+              Recent Transactions
+            </h3>
+            <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100/50">
+              <Zap size={14} className="text-indigo-600" />
+              <span className="text-xs font-black text-indigo-700">{profile?.credits || 0} CR</span>
+            </div>
+          </div>
+          <div className="p-0 overflow-x-auto">
+            {transactions.length > 0 ? (
+              <table className="w-full text-left">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Type</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Description</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Date</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded-lg ${tx.amount > 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
+                            {tx.amount > 0 ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                          </div>
+                          <span className="text-xs font-bold text-slate-700 capitalize">{tx.type}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-4 text-xs font-medium text-slate-500">{tx.description}</td>
+                      <td className="px-8 py-4 text-xs text-slate-400">
+                        {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleDateString() : 'Pending...'}
+                      </td>
+                      <td className={`px-8 py-4 text-sm font-black text-right ${tx.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {tx.amount > 0 ? '+' : ''}{tx.amount} CR
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200 mb-4">
+                  <History size={24} />
+                </div>
+                <p className="text-sm font-medium text-slate-400">No transactions recorded yet.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

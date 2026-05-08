@@ -9,6 +9,7 @@ import ReadingModule from './views/ReadingModule';
 import Catalog from './views/Catalog';
 import Login from './views/Login';
 import Profile from './views/Profile';
+import Pricing from './views/Pricing';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({ children, requiredRole }) => {
@@ -34,6 +35,7 @@ const AppRoutes: React.FC = () => {
         <Route path="reading" element={<ReadingModule />} />
         <Route path="catalog" element={<Catalog />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="pricing" element={<Pricing />} />
         {/* Fallbacks */}
         <Route path="listening" element={<div className="flex items-center justify-center h-full text-slate-400 font-medium">Listening module coming soon...</div>} />
         <Route path="mock-tests" element={<div className="flex items-center justify-center h-full text-slate-400 font-medium">Full Mock Test engine coming soon...</div>} />

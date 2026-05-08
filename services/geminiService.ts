@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { WritingScore, SpeakingScore } from "../types";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, orderBy, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, orderBy, Timestamp, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 
 // Initialize Gemini client strictly using process.env.API_KEY as per guidelines
@@ -179,7 +179,7 @@ export const saveSpeakingSession = async (userId: string, sessionData: any) => {
     await setDoc(sessionRef, {
       ...sessionData,
       id: sessionRef.id,
-      date: Timestamp.now()
+      date: serverTimestamp()
     });
   } catch (error) {
     console.error("Error saving speaking session:", error);

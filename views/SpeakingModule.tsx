@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mic, 
   Square, 
@@ -38,14 +38,21 @@ import {
   pcm16ToFloat32,
   float32ToPcm16
 } from '../services/geminiService';
+import { deductCredits, CREDIT_COSTS } from '../services/billingService';
 import { LiveServerMessage } from '@google/genai';
 import { doc, getDoc } from 'firebase/firestore';
-import { SpeakingScore } from '../types';
+import { SpeakingScore, ModuleType } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const SpeakingModule = () => {
   const [user] = useAuthState(auth);
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const [isActive, setIsActive] = useState(false);
-  const [transcript, setTranscript] = useState<{ sender: string; text: string }[]>([]);
+  const [isExaminerSpeaking, setIsExaminerSpeaking] = useState(false);
+  const [isCandidateSpeaking, setIsCandidateSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState<{ sender: string; text: string; id: string }[]>([]);
   const [activePrompt, setActivePrompt] = useState({
     category: 'Part 1',
     text: 'What do you enjoy doing in your free time?'
@@ -183,6 +190,17 @@ const SpeakingModule = () => {
   };
 
   const startSession = async () => {
+    if (!profile) return;
+    
+    // Credit check
+    const cost = CREDIT_COSTS[ModuleType.SPEAKING];
+    if ((profile.credits || 0) < cost) {
+      if (confirm(`You need ${cost} credits to start a Speaking Session. You currently have ${profile.credits || 0}. Would you like to top up?`)) {
+        navigate('/pricing');
+      }
+      return;
+    }
+
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextRef.current = audioCtx;
@@ -199,7 +217,11 @@ const SpeakingModule = () => {
 
       setIsActive(true);
       setTranscript([
-        { sender: 'Examiner', text: `Hello. Let's begin the speaking test. For Part 1, I'm going to ask you some general questions. ${activePrompt.text}` }
+        { 
+          id: 'initial',
+          sender: 'Examiner', 
+          text: `Hello. Let's begin the speaking test. For Part 1, I'm going to ask you some general questions. ${activePrompt.text}` 
+        }
       ]);
 
       const systemInstruction = `You are an official IELTS Speaking Examiner. 
@@ -271,6 +293,7 @@ const SpeakingModule = () => {
     }
 
     isPlayingRef.current = true;
+    setIsExaminerSpeaking(true);
     const ctx = audioContextRef.current;
     const chunk = audioQueueRef.current.shift()!;
     const buffer = ctx.createBuffer(1, chunk.length, 16000);
@@ -279,22 +302,31 @@ const SpeakingModule = () => {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
-    source.onended = () => playNextInQueue();
+    source.onended = () => {
+      // Check if more in queue, otherwise stop speaking status
+      if (audioQueueRef.current.length === 0) {
+        setIsExaminerSpeaking(false);
+      }
+      playNextInQueue();
+    };
     source.start();
   };
 
   const updateTranscript = (sender: string, text: string) => {
     setTranscript(prev => {
-      // If the last message is from the same sender, we might want to append?
-      // Actually, Live API sends chunks. Let's just manage unique-ish entries or trust the message flow.
       const last = prev[prev.length - 1];
-      if (last && last.sender === sender && sender === 'Examiner') {
-        // Simple heuristic: if it's the same sender and very recent, maybe group?
-        // For now, just append as new message for simplicity in real-time feel
-        return [...prev, { sender, text }];
+      // Basic deduplication and grouping for real-time chunks
+      if (last && last.sender === sender && (text.startsWith(last.text) || last.text.startsWith(text))) {
+        const longest = text.length > last.text.length ? text : last.text;
+        return [...prev.slice(0, -1), { ...last, text: longest }];
       }
-      return [...prev, { sender, text }];
+      return [...prev, { sender, text, id: Math.random().toString(36).substr(2, 9) }];
     });
+
+    if (sender === 'You') {
+      setIsCandidateSpeaking(true);
+      setTimeout(() => setIsCandidateSpeaking(false), 2000);
+    }
   };
 
   const stopSession = async () => {
@@ -315,6 +347,8 @@ const SpeakingModule = () => {
       }
       
       setIsActive(false);
+      setIsExaminerSpeaking(false);
+      setIsCandidateSpeaking(false);
       handleEvaluation();
     }
   };
@@ -322,6 +356,11 @@ const SpeakingModule = () => {
   const handleEvaluation = async () => {
     setIsSaving(true);
     try {
+      // Deduct credits first
+      if (user) {
+        await deductCredits(user.uid, ModuleType.SPEAKING, `Speaking Practice: ${activePrompt.category}`);
+      }
+
       // Combine transcript text for full analysis
       const fullTranscript = transcript.map(m => `${m.sender}: ${m.text}`).join('\n');
       const evaluation = await evaluateSpeaking(fullTranscript);
@@ -613,21 +652,44 @@ const SpeakingModule = () => {
                   <div className="flex justify-center mb-12">
                     <div className="relative">
                       <motion.div 
-                        animate={isActive ? { scale: [1, 1.05, 1], rotate: [0, 1, -1, 0] } : {}}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        className={`w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-inner ${
-                          isActive ? 'bg-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50'
+                        animate={isActive ? { 
+                          scale: isExaminerSpeaking ? [1, 1.1, 1] : 1,
+                          borderColor: isExaminerSpeaking ? ['#4f46e5', '#818cf8', '#4f46e5'] : '#f1f5f9'
+                        } : {}}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className={`w-32 h-32 md:w-48 md:h-48 rounded-full border-4 flex items-center justify-center transition-all duration-700 shadow-inner ${
+                          isActive ? 'bg-indigo-600 shadow-2xl shadow-indigo-200 border-indigo-400' : 'bg-slate-50 border-slate-100'
                         }`}
                       >
-                        {isActive ? <Bot size={64} className="text-white md:w-20 md:h-20" /> : <User size={64} className="text-slate-200 md:w-20 md:h-20" />}
+                        {isActive ? (
+                          <div className="relative">
+                            <Bot size={64} className="text-white md:w-20 md:h-20" />
+                            {isExaminerSpeaking && (
+                              <div className="absolute -inset-4 border-2 border-white/30 rounded-full animate-ping" />
+                            )}
+                          </div>
+                        ) : (
+                          <User size={64} className="text-slate-200 md:w-20 md:h-20" />
+                        )}
                       </motion.div>
+                      
                       {isActive && (
                         <motion.div 
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="absolute -bottom-1 -right-1 bg-green-500 p-4 rounded-full border-8 border-white text-white shadow-xl"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2"
                         >
-                          <Volume2 size={24} className="md:w-8 md:h-8" />
+                          {isExaminerSpeaking ? (
+                            <>
+                              <Volume2 size={12} className="animate-pulse" />
+                              Examiner Speaking
+                            </>
+                          ) : (
+                            <>
+                              <Mic size={12} className={isCandidateSpeaking ? "text-emerald-400" : "text-white/50"} />
+                              {isCandidateSpeaking ? "Listening to You" : "Speak Now"}
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </div>
@@ -637,59 +699,94 @@ const SpeakingModule = () => {
                     {!isActive ? (
                       <div className="flex flex-col items-center gap-4">
                         <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={startSession}
                           disabled={isSaving}
-                          className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                          className="bg-indigo-600 text-white px-12 py-5 rounded-3xl font-black text-xl flex items-center gap-4 shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50 group"
                         >
-                          {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Mic size={24} />}
-                          {isSaving ? "Saving Session..." : "Start Interview"}
+                          {isSaving ? <Loader2 className="animate-spin" size={24} /> : (
+                            <div className="p-2 bg-white/10 rounded-xl group-hover:rotate-12 transition-transform">
+                              <Mic size={24} />
+                            </div>
+                          )}
+                          {isSaving ? "Finalizing Report..." : "Start AI Interview"}
                         </motion.button>
                         {!isActive && !isSaving && (
                           <button 
                             onClick={() => setShowHistory(!showHistory)}
-                            className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em]"
+                            className="text-slate-400 font-bold text-xs flex items-center gap-2 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em] group"
                           >
-                            <History size={16} />
-                            {showHistory ? "Hide History" : "View Previous Tests"}
+                            <History size={16} className="group-hover:rotate-[-45deg] transition-transform" />
+                            {showHistory ? "Hide History" : "Previous Sessions"}
                           </button>
                         )}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto">
-                        <div className="w-full bg-slate-50/50 rounded-[2rem] border border-slate-100 p-6 md:p-8 max-h-[350px] overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-200">
-                          <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 sticky top-0 bg-slate-50/50 py-2 backdrop-blur-sm z-10">
-                            <Sparkles size={12} className="text-indigo-500" />
-                            Live Interview Transcript
-                          </div>
-                          {transcript.map((msg, i) => (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              key={i} 
-                              className={`flex flex-col ${msg.sender === 'You' ? 'items-end' : 'items-start'}`}
-                            >
-                              <span className={`text-[9px] font-black uppercase tracking-wider mb-1 ${msg.sender === 'You' ? 'text-indigo-500' : 'text-slate-400'}`}>
-                                {msg.sender === 'You' ? 'Candidate (You)' : 'IELTS Examiner'}
-                              </span>
-                              <div className={`max-w-[85%] p-4 rounded-2xl text-sm font-medium leading-relaxed text-left ${msg.sender === 'You' ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none shadow-sm'}`}>
-                                {msg.text}
+                        <div className="w-full bg-slate-50/50 rounded-[2.5rem] border border-slate-100 p-6 md:p-8 max-h-[400px] overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-200 relative group">
+                          <div className="flex items-center justify-between sticky top-0 bg-slate-50/50 py-3 backdrop-blur-md z-10 -mx-2 px-2 border-b border-slate-100/50 mb-4">
+                            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              <Sparkles size={12} className="text-indigo-500" />
+                              Live Session Recording
+                            </div>
+                            {isExaminerSpeaking && (
+                              <div className="flex gap-0.5 items-center">
+                                {[1,2,3,4].map(i => (
+                                  <motion.div 
+                                    key={i}
+                                    animate={{ height: [4, 12, 4] }}
+                                    transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                                    className="w-1 bg-indigo-400 rounded-full"
+                                  />
+                                ))}
                               </div>
-                            </motion.div>
-                          ))}
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-4">
+                            <AnimatePresence initial={false}>
+                              {transcript.map((msg) => (
+                                <motion.div 
+                                  key={msg.id}
+                                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  className={`flex flex-col ${msg.sender === 'You' ? 'items-end' : 'items-start'}`}
+                                >
+                                  <div className="flex items-center gap-2 mb-1 px-1">
+                                    {msg.sender === 'Examiner' && <Bot size={10} className="text-indigo-400" />}
+                                    <span className={`text-[9px] font-black uppercase tracking-wider ${msg.sender === 'You' ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                      {msg.sender === 'You' ? 'Candidate' : 'Examiner'}
+                                    </span>
+                                    {msg.sender === 'You' && <User size={10} className="text-indigo-400" />}
+                                  </div>
+                                  <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium leading-relaxed text-left transition-all ${
+                                    msg.sender === 'You' 
+                                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-xl shadow-indigo-100' 
+                                      : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none shadow-sm'
+                                  }`}>
+                                    {msg.text}
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          </div>
                           <div ref={transcriptEndRef} />
                         </div>
-                        <div className="flex flex-col items-center gap-4">
+
+                        <div className="flex flex-col items-center gap-4 w-full">
                           <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={stopSession}
-                            className="bg-rose-500 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-rose-100 hover:bg-rose-600 transition-all"
+                            className="w-full sm:w-auto bg-slate-900 text-white px-12 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 shadow-2xl shadow-slate-200 hover:bg-black transition-all active:scale-95"
                           >
-                            <Square size={24} />
-                            End & Save Session
+                            <Square size={20} className="fill-current" />
+                            Finish Interview
                           </motion.button>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">
+                            Credits will be deducted upon completion
+                          </p>
                         </div>
                       </div>
                     )}
