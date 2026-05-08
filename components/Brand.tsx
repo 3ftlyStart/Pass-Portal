@@ -17,13 +17,15 @@ export const Brand: React.FC<BrandProps> = ({
   
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <Logo size={size} variant={variant} />
-      <div className="flex flex-col items-start leading-none">
-        <div className={`font-logo tracking-tight ${isWhite ? 'text-white' : 'text-slate-800'}`} style={{ fontSize: size * 0.55 }}>
-          <span className={isWhite ? 'text-white' : 'text-brand-teal'}>ielts</span>
-          <span className="font-bold">hub</span>
+      <div className="flex flex-col items-start leading-[0.9]">
+        <div className={`font-logo tracking-tight ${isWhite ? 'text-white' : 'text-brand-teal'}`} style={{ fontSize: size * 0.5 }}>
+          ielts
+        </div>
+        <div className={`font-logo font-bold tracking-tight ${isWhite ? 'text-white' : 'text-slate-800'}`} style={{ fontSize: size * 0.5 }}>
+          hub
         </div>
       </div>
+      <Logo size={size} variant={variant} />
     </div>
   );
 };

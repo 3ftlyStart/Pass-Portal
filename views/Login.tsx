@@ -49,7 +49,7 @@ const Login: React.FC = () => {
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-4xl lg:text-5xl font-black leading-tight mb-8 tracking-tight font-heading">
+            <h1 className="text-4xl sm:text-5xl md:text-4xl lg:text-5xl font-black leading-tight mb-8 tracking-tight font-heading text-justify">
               Master the IELTS with <br />
               Smart AI.
             </h1>

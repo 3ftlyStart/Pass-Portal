@@ -23,7 +23,8 @@ import {
   Save,
   MessageSquare,
   ArrowUpDown,
-  Filter
+  Filter,
+  Library
 } from 'lucide-react';
 import { auth, db } from '../services/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -49,6 +50,13 @@ const SpeakingModule = () => {
     category: 'Part 1',
     text: 'What do you enjoy doing in your free time?'
   });
+  
+  const [cachedPrompts, setCachedPrompts] = useState<Record<string, string>>({
+    'Part 1': 'What do you enjoy doing in your free time?',
+    'Part 2': 'Describe a memorable event from your past. You have 1 minute to prepare.',
+    'Part 3': 'Compare and contrast your memorable event from Part 2 with a similar event from a different cultural context.'
+  });
+  const [isPromptListOpen, setIsPromptListOpen] = useState(false);
   
   const [usedPrompts, setUsedPrompts] = useState<Record<string, number[]>>({
     'Part 1': [0], // Initial prompt index
@@ -152,15 +160,26 @@ const SpeakingModule = () => {
       
       const nextIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
       setUsedPrompts(prev => ({ ...prev, [category]: [nextIdx] }));
-      setActivePrompt({ category, text: categoryPrompts[nextIdx] });
+      const newPrompt = { category, text: categoryPrompts[nextIdx] };
+      setActivePrompt(newPrompt);
+      setCachedPrompts(prev => ({ ...prev, [category]: newPrompt.text }));
     } else {
       const nextIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
       setUsedPrompts(prev => ({ 
         ...prev, 
         [category]: [...categoryUsed, nextIdx] 
       }));
-      setActivePrompt({ category, text: categoryPrompts[nextIdx] });
+      const newPrompt = { category, text: categoryPrompts[nextIdx] };
+      setActivePrompt(newPrompt);
+      setCachedPrompts(prev => ({ ...prev, [category]: newPrompt.text }));
     }
+  };
+
+  const handleCategorySwitch = (category: string) => {
+    setActivePrompt({
+      category,
+      text: cachedPrompts[category]
+    });
   };
 
   const startSession = async () => {
@@ -685,11 +704,11 @@ const SpeakingModule = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                    <BookOpen size={18} />
+                    <Filter size={18} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-800 tracking-tight font-heading">Practice Mode</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select a category to begin</p>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight font-heading">Question Filter</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select a category to filter prompts</p>
                   </div>
                 </div>
                 
@@ -697,7 +716,7 @@ const SpeakingModule = () => {
                   {(['Part 1', 'Part 2', 'Part 3'] as const).map((cat) => (
                     <button
                       key={cat}
-                      onClick={() => generateNewPrompt(cat)}
+                      onClick={() => handleCategorySwitch(cat)}
                       className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                         activePrompt.category === cat 
                           ? 'bg-white text-indigo-600 shadow-sm' 
@@ -710,12 +729,59 @@ const SpeakingModule = () => {
                 </div>
               </div>
 
-              <motion.div 
-                key={activePrompt.text} 
-                initial={{ opacity: 0, y: 10 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                className="bg-white p-8 md:p-10 rounded-[2.5rem] border-2 border-indigo-50 shadow-sm relative overflow-hidden group"
-              >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Sparkles size={12} className="text-indigo-500" />
+                    Step 1: Select Your Prompt
+                  </div>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setIsPromptListOpen(!isPromptListOpen)}
+                      className="flex items-center gap-2 bg-white border border-slate-100 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-600 hover:border-indigo-200 transition-all shadow-sm"
+                    >
+                      <Library size={12} />
+                      Browse All {activePrompt.category} Prompts
+                    </button>
+                    
+                    <AnimatePresence>
+                      {isPromptListOpen && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-3 max-h-64 overflow-y-auto"
+                        >
+                          <div className="px-4 py-2 border-b border-slate-50 mb-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Available Questions</p>
+                          </div>
+                          {prompts[activePrompt.category as keyof typeof prompts].map((p, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                const newPrompt = { category: activePrompt.category, text: p };
+                                setActivePrompt(newPrompt);
+                                setCachedPrompts(prev => ({ ...prev, [activePrompt.category]: p }));
+                                setIsPromptListOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-3 text-xs font-bold transition-all hover:bg-slate-50 flex gap-3 ${activePrompt.text === p ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-600'}`}
+                            >
+                              <span className="opacity-30">{idx + 1}.</span>
+                              <span className="line-clamp-2">{p}</span>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <motion.div 
+                  key={activePrompt.text} 
+                  initial={{ opacity: 0, y: 10 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  className="bg-white p-8 md:p-10 rounded-[2.5rem] border-2 border-indigo-50 shadow-sm relative overflow-hidden group"
+                >
                 <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
                   <MessageSquare size={120} />
                 </div>
@@ -748,6 +814,7 @@ const SpeakingModule = () => {
                 </div>
               </motion.div>
             </div>
+          </div>
           )}
         </div>
 
