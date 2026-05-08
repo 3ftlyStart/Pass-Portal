@@ -1,6 +1,8 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { WritingScore } from "../types";
+import { WritingScore, SpeakingScore } from "../types";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, orderBy, Timestamp } from "firebase/firestore";
+import { db } from "./firebase";
 
 // Initialize Gemini client strictly using process.env.API_KEY as per guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -34,42 +36,103 @@ export const evaluateWriting = async (prompt: string, essay: string): Promise<Wr
   return JSON.parse(response.text || '{}') as WritingScore;
 };
 
-export const evaluateSpeaking = async (transcript: string): Promise<{ feedback: string; band: number }> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Analyze the following IELTS Speaking transcript. Provide a concise overall band score (0-9) and a brief paragraph of constructive feedback on fluency, vocabulary, and grammar.
+export const evaluateSpeaking = async (transcript: string, audioBase64?: string): Promise<{ feedback: string; band: number; scores: SpeakingScore }> => {
+  const contents = audioBase64 
+    ? [
+        {
+          inlineData: {
+            mimeType: "audio/mp3", // Assuming mp3/wav based on most recording setups
+            data: audioBase64
+          }
+        },
+        {
+          text: `Analyze the following IELTS Speaking transcript AND the associated audio recording. 
+          Provide detailed feedback based on the 4 official IELTS assessment criteria. 
+          Pay special attention to pronunciation and intonation in the audio.
+          
+          Transcript:
+          ${transcript}`
+        }
+      ]
+    : `Analyze the following IELTS Speaking transcript. Provide detailed feedback based on the 4 official IELTS assessment criteria. 
     
     Transcript:
-    ${transcript}`,
+    ${transcript}`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: contents,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          feedback: { type: Type.STRING },
-          band: { type: Type.NUMBER }
+          feedback: { type: Type.STRING, description: "A brief overall summary of the candidate's performance." },
+          band: { type: Type.NUMBER, description: "The estimated overall band score (0-9)." },
+          scores: {
+            type: Type.OBJECT,
+            properties: {
+              overallBand: { type: Type.NUMBER },
+              fluencyCoherence: { type: Type.STRING, description: "Feedback on fluency and coherence." },
+              lexicalResource: { type: Type.STRING, description: "Feedback on vocabulary usage." },
+              grammaticalRange: { type: Type.STRING, description: "Feedback on grammar accuracy and range." },
+              pronunciation: { type: Type.STRING, description: "Feedback on pronunciation (based on transcript clues)." }
+            },
+            required: ["overallBand", "fluencyCoherence", "lexicalResource", "grammaticalRange", "pronunciation"]
+          }
         },
-        required: ["feedback", "band"]
+        required: ["feedback", "band", "scores"]
       }
     }
   });
 
-  return JSON.parse(response.text || '{"feedback": "No feedback available.", "band": 0}');
+  try {
+    return JSON.parse(response.text || '');
+  } catch (e) {
+    console.error("Failed to parse AI evaluation:", e);
+    const fallback: SpeakingScore = {
+      overallBand: 0,
+      fluencyCoherence: "Not available.",
+      lexicalResource: "Not available.",
+      grammaticalRange: "Not available.",
+      pronunciation: "Not available."
+    };
+    return { feedback: "Evaluation failed.", band: 0, scores: fallback };
+  }
 };
 
-export const getLiveSession = (callbacks: any) => {
+export const getLiveSession = (callbacks: any, systemInstruction?: string) => {
   return ai.live.connect({
-    model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+    model: 'gemini-3.1-flash-live-preview',
     callbacks,
     config: {
-      // responseModalities must contain exactly one Modality.AUDIO element
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } },
       },
-      systemInstruction: "You are an official IELTS Speaking Examiner. Your goal is to conduct a professional, formal 3-part interview while providing clear guidance to the candidate throughout the process.\n\n**Structure of the Interview:**\n\n1. **Part 1: Introduction and Familiar Topics (4-5 minutes):**\n   - Begin by asking the candidate's name and then transition to general questions on familiar topics such as their daily routine and hobbies.\n   - Explicitly guide them: 'In this first part, I’d like to ask you some questions about yourself. Let’s talk about your daily routine...'\n\n2. **Part 2: Individual Long Turn (3-4 minutes):**\n   - Explain the format: 'Now, I’m going to give you a topic and I’d like you to talk about it for one to two minutes. Before you talk, you’ll have one minute to think about what you’re going to say.'\n   - Topic: 'Describe a memorable event from your past.'\n   - Manually manage the 1-minute preparation time before inviting them to speak.\n\n3. **Part 3: Two-Way Discussion (4-5 minutes):**\n   - Transition by saying: 'We’ve been talking about a memorable event from your past, and I’d now like to discuss with you one or two more general questions related to this.'\n   - Focus: Compare and contrast their memorable event from Part 2 with a similar event from a different cultural context.\n   - Encourage deeper discussion and abstract thinking about societal trends or cultural significance.\n\n**Examiner Persona:**\n- Be professional, slightly formal, and encouraging.\n- Use natural transition phrases between parts to guide the candidate.\n- Ask follow-up questions to push the candidate to speak at length.",
+      systemInstruction: systemInstruction || "You are an official IELTS Speaking Examiner. Your goal is to conduct a professional, formal interview while providing clear guidance to the candidate throughout the process.",
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
     },
   });
+};
+
+export const pcm16ToFloat32 = (pcmData: Uint8Array): Float32Array => {
+  const int16Array = new Int16Array(pcmData.buffer);
+  const float32Array = new Float32Array(int16Array.length);
+  for (let i = 0; i < int16Array.length; i++) {
+    float32Array[i] = int16Array[i] / 32768.0;
+  }
+  return float32Array;
+};
+
+export const float32ToPcm16 = (float32Array: Float32Array): Uint8Array => {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 32768 : s * 32767;
+  }
+  return new Uint8Array(int16Array.buffer);
 };
 
 export const encodeAudio = (bytes: Uint8Array) => {
@@ -109,3 +172,35 @@ export async function decodeAudioData(
   }
   return buffer;
 }
+
+export const saveSpeakingSession = async (userId: string, sessionData: any) => {
+  try {
+    const sessionRef = doc(collection(db, `users/${userId}/speakingSessions`));
+    await setDoc(sessionRef, {
+      ...sessionData,
+      id: sessionRef.id,
+      date: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error saving speaking session:", error);
+    throw error;
+  }
+};
+
+export const getSpeakingHistory = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, `users/${userId}/speakingSessions`),
+      orderBy("date", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id,
+      date: doc.data().date instanceof Timestamp ? doc.data().date.toDate().toISOString() : doc.data().date
+    }));
+  } catch (error) {
+    console.error("Error fetching speaking history:", error);
+    return [];
+  }
+};

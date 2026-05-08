@@ -15,13 +15,15 @@ import {
   Target as TargetIcon,
   LogOut,
   User as UserIcon,
-  Crown
+  Crown,
+  Library
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../context/AuthContext';
 import { Brand } from './Brand';
+import WhatsAppWidget from './WhatsAppWidget';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -44,6 +46,7 @@ const Layout: React.FC = () => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Reading', path: '/reading', icon: BookOpen },
     { name: 'Listening', path: '/listening', icon: Headphones },
+    { name: 'Practice Material', path: '/catalog', icon: Library },
     { name: 'Writing', path: '/writing', icon: PenTool },
     { name: 'Speaking', path: '/speaking', icon: Mic2 },
     { name: 'Mock Tests', path: '/mock-tests', icon: GraduationCap },
@@ -228,6 +231,7 @@ const Layout: React.FC = () => {
             <Outlet />
           </div>
         </div>
+        <WhatsAppWidget />
       </main>
     </div>
   );

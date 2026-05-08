@@ -6,6 +6,7 @@ import Dashboard from './views/Dashboard';
 import WritingModule from './views/WritingModule';
 import SpeakingModule from './views/SpeakingModule';
 import ReadingModule from './views/ReadingModule';
+import Catalog from './views/Catalog';
 import Login from './views/Login';
 import Profile from './views/Profile';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -31,6 +32,7 @@ const AppRoutes: React.FC = () => {
         <Route path="writing" element={<WritingModule />} />
         <Route path="speaking" element={<SpeakingModule />} />
         <Route path="reading" element={<ReadingModule />} />
+        <Route path="catalog" element={<Catalog />} />
         <Route path="profile" element={<Profile />} />
         {/* Fallbacks */}
         <Route path="listening" element={<div className="flex items-center justify-center h-full text-slate-400 font-medium">Listening module coming soon...</div>} />

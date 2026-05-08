@@ -28,6 +28,14 @@ export interface WritingScore {
   suggestedCorrections: string[];
 }
 
+export interface SpeakingScore {
+  overallBand: number;
+  fluencyCoherence: string;
+  lexicalResource: string;
+  grammaticalRange: string;
+  pronunciation: string;
+}
+
 export interface SpeakingSession {
   id: string;
   date: string;
@@ -36,6 +44,7 @@ export interface SpeakingSession {
   audioBlobId?: string; // For IndexedDB storage
   feedback?: string;
   overallBand?: number;
+  scores?: SpeakingScore;
 }
 
 export interface ReadingQuestion {

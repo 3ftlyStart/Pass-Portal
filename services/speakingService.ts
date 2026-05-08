@@ -10,7 +10,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { set, get } from 'idb-keyval';
-import { SpeakingSession } from '../types';
+import { SpeakingSession, SpeakingScore } from '../types';
 
 const SESSIONS_COLLECTION = 'speaking_sessions';
 
@@ -18,7 +18,8 @@ export const saveSpeakingSession = async (
   transcript: { sender: 'Examiner' | 'You', text: string }[],
   feedback: string,
   band: number,
-  audioBlob?: Blob
+  audioBlob?: Blob,
+  scores?: SpeakingScore
 ) => {
   if (!auth.currentUser) throw new Error("User must be signed in to save sessions.");
 
@@ -36,6 +37,7 @@ export const saveSpeakingSession = async (
     transcript,
     feedback,
     overallBand: band,
+    scores,
     audioBlobId: sessionId, // ID to retrieve from IDB
     createdAt: Timestamp.now()
   };

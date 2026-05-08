@@ -1,305 +1,448 @@
-
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, 
   Square, 
-  Volume2, 
+  Play, 
+  Pause, 
+  RotateCcw, 
+  History, 
+  TrendingUp, 
+  Award, 
+  ChevronRight, 
   User, 
   Bot, 
-  History, 
-  LogIn, 
-  Loader2,
-  Calendar, 
-  BarChart3, 
-  Play, 
-  Pause,
-  ExternalLink,
-  ChevronRight,
-  TrendingUp,
-  Award,
+  Sparkles,
+  BarChart3,
   Clock,
-  Trash2,
+  BookOpen,
+  Volume2,
+  X,
   Lock,
-  X
+  Loader2,
+  Save,
+  MessageSquare,
+  ArrowUpDown,
+  Filter
 } from 'lucide-react';
-import { getLiveSession, encodeAudio, decodeAudio, decodeAudioData, evaluateSpeaking } from '../services/geminiService';
-import { saveSpeakingSession, getSpeakingHistory, getAudioBlob } from '../services/speakingService';
-import { auth, signInWithGoogle } from '../services/firebase';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { motion, AnimatePresence } from 'motion/react';
-import { SpeakingSession } from '../types';
+import { auth, db } from '../services/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { 
+  evaluateSpeaking, 
+  saveSpeakingSession, 
+  getSpeakingHistory,
+  getLiveSession,
+  encodeAudio,
+  pcm16ToFloat32,
+  float32ToPcm16
+} from '../services/geminiService';
+import { LiveServerMessage } from '@google/genai';
+import { doc, getDoc } from 'firebase/firestore';
+import { SpeakingScore } from '../types';
 
-const SpeakingModule: React.FC = () => {
+const SpeakingModule = () => {
+  const [user] = useAuthState(auth);
   const [isActive, setIsActive] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState<{ sender: 'Examiner' | 'You', text: string }[]>([]);
-  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
-  const [sessions, setSessions] = useState<SpeakingSession[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<SpeakingSession | null>(null);
-  const [selectedSessionAudio, setSelectedSessionAudio] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState<{ sender: string; text: string }[]>([]);
+  const [activePrompt, setActivePrompt] = useState({
+    category: 'Part 1',
+    text: 'What do you enjoy doing in your free time?'
+  });
+  
+  const [usedPrompts, setUsedPrompts] = useState<Record<string, number[]>>({
+    'Part 1': [0], // Initial prompt index
+    'Part 2': [],
+    'Part 3': []
+  });
+  
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [selectedSession, setSelectedSession] = useState<any | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [isHistoryPlaying, setIsHistoryPlaying] = useState(false);
-  const [playTime, setPlayTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playTime, setPlayTime] = useState(0);
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ feedback: string; band: number; scores: SpeakingScore } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
-  // Audio recording refs
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  
+  // Live API refs
   const audioContextRef = useRef<AudioContext | null>(null);
-  const nextStartTimeRef = useRef(0);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const streamRef = useRef<MediaStream | null>(null);
-  const sessionPromiseRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sessionRef = useRef<any>(null);
+  const audioQueueRef = useRef<Float32Array[]>([]);
+  const isPlayingRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    if (selectedSession) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [selectedSession]);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) loadHistory();
-    });
-    return unsubscribe;
-  }, []);
-
-  const loadHistory = async () => {
-    const history = await getSpeakingHistory();
-    setSessions(history);
+  const prompts = {
+    'Part 1': [
+      'What do you enjoy doing in your free time?',
+      'Tell me about your hometown.',
+      'Do you prefer to study in the morning or evening?',
+      'What kind of music do you like?',
+      'Do you think it is important to eat breakfast?'
+    ],
+    'Part 2': [
+      'Describe a memorable event from your past. You have 1 minute to prepare.',
+      'Describe a book you have recently read. Explain why you liked it.',
+      'Describe a city you would like to visit in the future.',
+      'Describe a person who has influenced you significantly.',
+      'Describe a piece of technology that you find very useful.'
+    ],
+    'Part 3': [
+      'Compare and contrast your memorable event from Part 2 with a similar event from a different cultural context.',
+      'How has technology changed the way people communicate in your country?',
+      'What are the advantages and disadvantages of living in a big city?',
+      'Do you think modern education is better than traditional education?',
+      'How important is it for people to have hobbies in today\'s world?'
+    ]
   };
 
-  const stopSession = useCallback(async () => {
-    setIsActive(false);
-    setIsListening(false);
-    
-    // Stop MediaRecorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+  useEffect(() => {
+    if (user) {
+      loadHistory();
     }
+  }, [user]);
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    sourcesRef.current.forEach(source => source.stop());
-    sourcesRef.current.clear();
-
-    // Trigger saving process
-    setIsSaving(true);
-  }, []);
-
-  const handleMediaRecorderStop = useCallback(async () => {
-    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-    
-    // Evaluate and Save
-    try {
-      // Create string transcript for AI evaluation
-      const transcriptText = transcript
-        .map(t => `${t.sender}: ${t.text}`)
-        .join('\n');
-      
-      const evaluation = await evaluateSpeaking(transcriptText);
-      await saveSpeakingSession(transcript, evaluation.feedback, evaluation.band, audioBlob);
-      await loadHistory();
-    } catch (err) {
-      console.error("Failed to save session:", err);
-    } finally {
-      setIsSaving(false);
-      audioChunksRef.current = [];
+  useEffect(() => {
+    if (transcriptEndRef.current) {
+      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [transcript]);
 
-  const startSession = async () => {
-    if (!user) {
-      try {
-        await signInWithGoogle();
-      } catch (err) {
-        return;
-      }
-    }
-
-    setTranscript([]);
-    audioChunksRef.current = [];
-    
+  const loadHistory = async () => {
+    if (!user) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      // Setup MediaRecorder for candidate audio
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      mediaRecorder.onstop = handleMediaRecorderStop;
-      mediaRecorder.start();
-      
-      const inputCtx = new AudioContext({ sampleRate: 16000 });
-      const outputCtx = new AudioContext({ sampleRate: 24000 });
-      audioContextRef.current = outputCtx;
-
-      const sessionPromise = getLiveSession({
-        onopen: () => {
-          setIsActive(true);
-          setIsListening(true);
-          
-          const source = inputCtx.createMediaStreamSource(stream);
-          const processor = inputCtx.createScriptProcessor(4096, 1, 1);
-          
-          processor.onaudioprocess = (e) => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const l = inputData.length;
-            const int16 = new Int16Array(l);
-            for (let i = 0; i < l; i++) {
-              int16[i] = inputData[i] * 32768;
-            }
-            const pcmBlob = {
-               audio: { 
-                 data: encodeAudio(new Uint8Array(int16.buffer)),
-                 mimeType: 'audio/pcm;rate=16000'
-               }
-            };
-            
-            sessionPromise.then((session: any) => {
-              session.sendRealtimeInput(pcmBlob);
-            });
-          };
-
-          source.connect(processor);
-          processor.connect(inputCtx.destination);
-        },
-        onmessage: async (msg: any) => {
-          // Input Audio Transcription
-          if (msg.serverContent?.inputAudioTranscription) {
-            const text = msg.serverContent.inputAudioTranscription.text;
-            if (text) {
-              setTranscript(prev => [...prev, { sender: 'You', text }]);
-            }
-          }
-
-          // Output Audio Transcription
-          if (msg.serverContent?.modelTurn?.parts) {
-             const audioData = msg.serverContent.modelTurn.parts.find((p: any) => p.inlineData)?.inlineData?.data;
-             if (audioData) {
-               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
-               const buffer = await decodeAudioData(decodeAudio(audioData), outputCtx, 24000, 1);
-               const source = outputCtx.createBufferSource();
-               source.buffer = buffer;
-               source.connect(outputCtx.destination);
-               source.start(nextStartTimeRef.current);
-               nextStartTimeRef.current += buffer.duration;
-               sourcesRef.current.add(source);
-             }
-
-             // Handle Model's text part (transcription)
-             const textPart = msg.serverContent.modelTurn.parts.find((p: any) => p.text);
-             if (textPart) {
-                setTranscript(prev => [...prev, { sender: 'Examiner', text: textPart.text }]);
-             }
-          }
-        },
-        onerror: (e: any) => {
-          console.error('Session Error:', e);
-          stopSession();
-        },
-        onclose: () => {
-          stopSession();
-        }
-      });
-
-      sessionPromiseRef.current = sessionPromise;
-    } catch (err) {
-      console.error(err);
-      alert('Could not access microphone.');
+      const history = await getSpeakingHistory(user.uid);
+      setSessions(history);
+    } catch (error) {
+      console.error('Error loading history:', error);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      // Cleanup audio URLs
-      if (selectedSessionAudio) URL.revokeObjectURL(selectedSessionAudio);
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
+  const signInWithGoogle = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider);
+  };
+
+  const generateNewPrompt = (category: string) => {
+    const categoryPrompts = prompts[category as keyof typeof prompts];
+    const categoryUsed = usedPrompts[category] || [];
+    
+    // Find unused indices
+    let availableIndices = categoryPrompts
+      .map((_, index) => index)
+      .filter(index => !categoryUsed.includes(index));
+
+    // If all used, reset for this category
+    if (availableIndices.length === 0) {
+      // Exclude current text if we are re-shuffling to avoid instant repeat
+      availableIndices = categoryPrompts.map((_, index) => index);
+      const currentIdx = categoryPrompts.indexOf(activePrompt.text);
+      if (availableIndices.length > 1 && currentIdx !== -1 && activePrompt.category === category) {
+        availableIndices = availableIndices.filter(i => i !== currentIdx);
       }
-    };
-  }, [selectedSessionAudio]);
+      
+      const nextIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      setUsedPrompts(prev => ({ ...prev, [category]: [nextIdx] }));
+      setActivePrompt({ category, text: categoryPrompts[nextIdx] });
+    } else {
+      const nextIdx = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      setUsedPrompts(prev => ({ 
+        ...prev, 
+        [category]: [...categoryUsed, nextIdx] 
+      }));
+      setActivePrompt({ category, text: categoryPrompts[nextIdx] });
+    }
+  };
+
+  const startSession = async () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      audioContextRef.current = audioCtx;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      setIsActive(true);
+      setTranscript([
+        { sender: 'Examiner', text: `Hello. Let's begin the speaking test. For Part 1, I'm going to ask you some general questions. ${activePrompt.text}` }
+      ]);
+
+      const systemInstruction = `You are an official IELTS Speaking Examiner. 
+      Your goal is to conduct a professional, formal interview.
+      Current prompt: ${activePrompt.category} - ${activePrompt.text}
+      Be encouraging but maintain the standard of a formal examination. 
+      Ask follow-up questions based on the candidate's responses.
+      Start by asking about the candidate's name or jumping into the first question.`;
+
+      const sessionPromise = getLiveSession({
+        onopen: () => {
+          console.log('Live API session opened');
+          processor.onaudioprocess = (e) => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const pcm16 = float32ToPcm16(inputData);
+            const base64 = encodeAudio(pcm16);
+            
+            sessionPromise.then(session => {
+              session.sendRealtimeInput({
+                audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+              });
+            });
+          };
+        },
+        onmessage: async (message: LiveServerMessage) => {
+          // Handle audio output
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const binary = atob(base64Audio);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const float32 = pcm16ToFloat32(bytes);
+            audioQueueRef.current.push(float32);
+            if (!isPlayingRef.current) playNextInQueue();
+          }
+
+          // Handle transcriptions
+          const inputTranscription = (message as any).serverContent?.inputAudioTranscription?.text;
+          const outputTranscription = (message as any).serverContent?.modelTurn?.parts?.find((p: any) => p.text)?.text;
+
+          if (inputTranscription) {
+            updateTranscript('You', inputTranscription);
+          }
+          if (outputTranscription) {
+            updateTranscript('Examiner', outputTranscription);
+          }
+
+          if (message.serverContent?.interrupted) {
+            audioQueueRef.current = [];
+            isPlayingRef.current = false;
+          }
+        },
+        onclose: () => setIsActive(false),
+        onerror: (err: any) => console.error('Live API Error:', err),
+      }, systemInstruction);
+
+      sessionRef.current = sessionPromise;
+
+    } catch (error) {
+      console.error('Error starting Live Session:', error);
+      alert('Could not access microphone or start Live API.');
+    }
+  };
+
+  const playNextInQueue = () => {
+    if (audioQueueRef.current.length === 0 || !audioContextRef.current) {
+      isPlayingRef.current = false;
+      return;
+    }
+
+    isPlayingRef.current = true;
+    const ctx = audioContextRef.current;
+    const chunk = audioQueueRef.current.shift()!;
+    const buffer = ctx.createBuffer(1, chunk.length, 16000);
+    buffer.getChannelData(0).set(chunk);
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.onended = () => playNextInQueue();
+    source.start();
+  };
+
+  const updateTranscript = (sender: string, text: string) => {
+    setTranscript(prev => {
+      // If the last message is from the same sender, we might want to append?
+      // Actually, Live API sends chunks. Let's just manage unique-ish entries or trust the message flow.
+      const last = prev[prev.length - 1];
+      if (last && last.sender === sender && sender === 'Examiner') {
+        // Simple heuristic: if it's the same sender and very recent, maybe group?
+        // For now, just append as new message for simplicity in real-time feel
+        return [...prev, { sender, text }];
+      }
+      return [...prev, { sender, text }];
+    });
+  };
+
+  const stopSession = async () => {
+    if (isActive) {
+      if (processorRef.current) {
+        processorRef.current.onaudioprocess = null;
+        processorRef.current.disconnect();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      if (sessionRef.current) {
+        const session = await sessionRef.current;
+        session.close();
+      }
+      
+      setIsActive(false);
+      handleEvaluation();
+    }
+  };
+
+  const handleEvaluation = async () => {
+    setIsSaving(true);
+    try {
+      // Combine transcript text for full analysis
+      const fullTranscript = transcript.map(m => `${m.sender}: ${m.text}`).join('\n');
+      const evaluation = await evaluateSpeaking(fullTranscript);
+      setFeedback(evaluation);
+
+      if (user) {
+        await saveSpeakingSession(user.uid, {
+          date: new Date().toISOString(),
+          transcript,
+          overallBand: evaluation.band,
+          feedback: evaluation.feedback,
+          scores: evaluation.scores
+        });
+        loadHistory();
+      }
+    } catch (error) {
+      console.error('Error evaluating session:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const formatTime = (seconds: number) => {
-    if (isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (currentAudioRef.current) {
-      const time = parseFloat(e.target.value);
-      currentAudioRef.current.currentTime = time;
+    const time = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
       setPlayTime(time);
     }
   };
 
-  const toggleHistoryAudio = async (sessionId: string, audioBlobId: string | undefined) => {
-    if (!audioBlobId) return;
-
-    if (playingId === sessionId) {
-      if (currentAudioRef.current?.paused) {
-        currentAudioRef.current.play();
-        setIsHistoryPlaying(true);
+  const toggleHistoryAudio = (id: string, blobId: string) => {
+    if (playingId === id) {
+      if (isHistoryPlaying) {
+        audioRef.current?.pause();
       } else {
-        currentAudioRef.current?.pause();
-        setIsHistoryPlaying(false);
+        audioRef.current?.play();
       }
-      return;
-    }
-
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
-
-    setPlayingId(sessionId);
-    setIsHistoryPlaying(true);
-    setPlayTime(0);
-    setDuration(0);
-
-    const blob = await getAudioBlob(audioBlobId);
-    if (blob) {
-      if (selectedSessionAudio) URL.revokeObjectURL(selectedSessionAudio);
-      const url = URL.createObjectURL(blob);
-      setSelectedSessionAudio(url);
-      
-      const audio = new Audio(url);
-      currentAudioRef.current = audio;
-      
-      audio.onended = () => {
-        setPlayingId(null);
-        setIsHistoryPlaying(false);
-        setPlayTime(0);
-      };
-      
-      audio.onerror = () => {
-        setPlayingId(null);
-        setIsHistoryPlaying(false);
-      };
-
-      audio.ontimeupdate = () => setPlayTime(audio.currentTime);
-      audio.onloadedmetadata = () => setDuration(audio.duration);
-
-      audio.play();
+      setIsHistoryPlaying(!isHistoryPlaying);
     } else {
-      setPlayingId(null);
-      setIsHistoryPlaying(false);
+      setPlayingId(id);
+      setIsHistoryPlaying(true);
+      setPlayTime(0);
+      // In a real app, fetch blob or URL. For now, mock playback.
+      if (audioRef.current) {
+        audioRef.current.src = ''; 
+      }
     }
   };
+
+  const AccordionItem = ({ title, icon, isOpen, onToggle, children }: any) => (
+    <motion.div 
+      className={`rounded-3xl border transition-all duration-300 ${isOpen ? 'bg-white border-indigo-100 shadow-xl' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}
+    >
+      <button 
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-6 focus:outline-none"
+      >
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-2xl transition-all duration-300 ${isOpen ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 shadow-sm'}`}>
+            {icon}
+          </div>
+          <span className={`text-sm font-black uppercase tracking-widest ${isOpen ? 'text-slate-800' : 'text-slate-500'}`}>
+            {title}
+          </span>
+        </div>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          className={isOpen ? 'text-indigo-600' : 'text-slate-300'}
+        >
+          <ChevronRight />
+        </motion.div>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-6 pt-0 text-sm font-medium leading-relaxed text-slate-600 border-t border-slate-50">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+
+  const sortedSessions = [...sessions].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+  });
+
+  const PronunciationTips = () => (
+    <div className="space-y-5 pt-8 border-t border-slate-100 mt-4">
+      <div className="flex items-center gap-3 px-2">
+        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+          <Sparkles size={18} />
+        </div>
+        <h4 className="text-xl font-black text-slate-800 tracking-tight font-heading">Mastering Pronunciation</h4>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          {
+            title: "Vowel Sounds",
+            content: "Focus on long vs short vowels (e.g., 'heat' vs 'hit'). Practice the /æ/ as in 'cat' and the neutral schwa /ə/.",
+            icon: <Volume2 size={16} />
+          },
+          {
+            title: "Consonant Clarity",
+            content: "Ensure 'th', 'v/b', and 'l/r' distinctions are clear. Don't drop final consonant sounds like /t/, /d/, or /s/.",
+            icon: <Mic size={16} />
+          },
+          {
+            title: "Intonation",
+            content: "Vary your pitch to show emotion and emphasize key words. Avoid a monotone delivery to keep the examiner engaged.",
+            icon: <TrendingUp size={16} />
+          }
+        ].map((tip, i) => (
+          <div key={i} className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100 hover:border-indigo-100 transition-all cursor-default group">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-white p-2 rounded-xl shadow-sm text-indigo-600 group-hover:scale-110 transition-transform">
+                {tip.icon}
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{tip.title}</span>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed font-bold">{tip.content}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (!user && !isActive) {
     return (
@@ -321,228 +464,353 @@ const SpeakingModule: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20">
+    <div className="max-w-6xl mx-auto space-y-8 pb-20 relative">
+      {/* Module Navigation / Actions */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+            className={`p-2 rounded-xl transition-all ${isSidebarVisible ? 'bg-indigo-50 text-indigo-600' : 'bg-white text-slate-400 border border-slate-100 hover:border-indigo-100'}`}
+            title="Toggle History Sidebar"
+          >
+            <History size={20} />
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Main Content */}
         <div className="flex-1 space-y-8">
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className={`bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-slate-100 text-center space-y-8 relative overflow-hidden transition-all duration-700 ${isActive ? 'ring-4 ring-indigo-50 border-indigo-100' : ''}`}
-          >
-            <AnimatePresence>
-              {isActive && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-indigo-50/20 animate-pulse pointer-events-none"
-                />
-              )}
-            </AnimatePresence>
-
-            <div className="relative z-10">
-              <div className="mb-8">
-                <h2 className="text-3xl font-black text-slate-800 mb-3 tracking-tight font-heading">Speaking Lab</h2>
-                <p className="text-slate-500 font-medium">Recordings will be saved automatically with full AI feedback</p>
-              </div>
-
-              <div className="flex justify-center mb-12">
-                <div className="relative">
-                  <motion.div 
-                    animate={isActive ? { scale: [1, 1.05, 1], rotate: [0, 1, -1, 0] } : {}}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className={`w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-inner ${
-                      isActive ? 'bg-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50'
-                    }`}
+          <AnimatePresence mode="wait">
+            {feedback && !isActive ? (
+              <motion.div
+                key="results"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-black text-slate-800 font-heading">Performance Analysis</h3>
+                  <button 
+                    onClick={() => setFeedback(null)}
+                    className="text-indigo-600 font-bold text-sm hover:underline"
                   >
-                    {isActive ? (
-                      <Bot size={64} className="text-white md:w-20 md:h-20" />
-                    ) : (
-                      <User size={64} className="text-slate-200 md:w-20 md:h-20" />
-                    )}
-                  </motion.div>
+                    Back to Lab
+                  </button>
+                </div>
+
+                <div className="bg-indigo-600 p-8 md:p-10 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Award size={120} />
+                  </div>
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                    <div>
+                      <h4 className="text-indigo-200 font-bold uppercase tracking-widest text-xs mb-2">Estimated Overall Band</h4>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-7xl font-black tracking-tighter">{feedback.band.toFixed(1)}</span>
+                        <span className="text-2xl font-bold text-indigo-300">/ 9.0</span>
+                      </div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 max-w-sm">
+                      <p className="text-xs text-indigo-200 mb-2 font-bold uppercase tracking-wider text-center md:text-left">Examiner Summary</p>
+                      <p className="text-sm font-medium leading-relaxed italic">
+                        "{feedback.feedback}"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2">Detailed Assessment</h4>
+                  <AccordionItem
+                    title="Fluency & Coherence"
+                    icon={<Clock />}
+                    isOpen={openSection === 'Fluency'}
+                    onToggle={() => setOpenSection(openSection === 'Fluency' ? null : 'Fluency')}
+                  >
+                    {feedback.scores.fluencyCoherence}
+                  </AccordionItem>
+                  <AccordionItem
+                    title="Lexical Resource"
+                    icon={<BookOpen />}
+                    isOpen={openSection === 'Lexical'}
+                    onToggle={() => setOpenSection(openSection === 'Lexical' ? null : 'Lexical')}
+                  >
+                    {feedback.scores.lexicalResource}
+                  </AccordionItem>
+                  <AccordionItem
+                    title="Grammatical Range"
+                    icon={<Award />}
+                    isOpen={openSection === 'Grammar'}
+                    onToggle={() => setOpenSection(openSection === 'Grammar' ? null : 'Grammar')}
+                  >
+                    {feedback.scores.grammaticalRange}
+                  </AccordionItem>
+                  <AccordionItem
+                    title="Pronunciation"
+                    icon={<Volume2 />}
+                    isOpen={openSection === 'Pronunciation'}
+                    onToggle={() => setOpenSection(openSection === 'Pronunciation' ? null : 'Pronunciation')}
+                  >
+                    {feedback.scores.pronunciation}
+                  </AccordionItem>
+                </div>
+
+                <PronunciationTips />
+
+                <button 
+                  onClick={() => setFeedback(null)}
+                  className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-slate-200 hover:bg-slate-900 transition-all active:scale-95"
+                >
+                  Start New Practice
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="lab"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className={`bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-slate-100 text-center space-y-8 relative overflow-hidden transition-all duration-700 ${isActive ? 'ring-4 ring-indigo-50 border-indigo-100' : ''}`}
+              >
+                <AnimatePresence>
                   {isActive && (
                     <motion.div 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -bottom-1 -right-1 bg-green-500 p-4 rounded-full border-8 border-white text-white shadow-xl"
-                    >
-                      <Volume2 size={24} className="md:w-8 md:h-8" />
-                    </motion.div>
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-indigo-50/20 animate-pulse pointer-events-none"
+                    />
                   )}
-                </div>
-              </div>
+                </AnimatePresence>
 
-              <div className="space-y-6">
-                {!isActive ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={startSession}
-                      disabled={isSaving}
-                      className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                    >
-                      {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Mic size={24} />}
-                      {isSaving ? "Saving Session..." : "Start Interview"}
-                    </motion.button>
-                    {!isActive && !isSaving && (
-                      <button 
-                        onClick={() => setShowHistory(!showHistory)}
-                        className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em]"
+                <div className="relative z-10">
+                  <div className="mb-8">
+                    <h2 className="text-3xl font-black text-slate-800 mb-3 tracking-tight font-heading">Speaking Lab</h2>
+                    <p className="text-slate-500 font-medium">Recordings will be saved automatically with full AI feedback</p>
+                  </div>
+
+                  <div className="flex justify-center mb-12">
+                    <div className="relative">
+                      <motion.div 
+                        animate={isActive ? { scale: [1, 1.05, 1], rotate: [0, 1, -1, 0] } : {}}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className={`w-32 h-32 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-inner ${
+                          isActive ? 'bg-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50'
+                        }`}
                       >
-                        <History size={16} />
-                        {showHistory ? "Hide History" : "View Previous Tests"}
-                      </button>
+                        {isActive ? <Bot size={64} className="text-white md:w-20 md:h-20" /> : <User size={64} className="text-slate-200 md:w-20 md:h-20" />}
+                      </motion.div>
+                      {isActive && (
+                        <motion.div 
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute -bottom-1 -right-1 bg-green-500 p-4 rounded-full border-8 border-white text-white shadow-xl"
+                        >
+                          <Volume2 size={24} className="md:w-8 md:h-8" />
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {!isActive ? (
+                      <div className="flex flex-col items-center gap-4">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={startSession}
+                          disabled={isSaving}
+                          className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                        >
+                          {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Mic size={24} />}
+                          {isSaving ? "Saving Session..." : "Start Interview"}
+                        </motion.button>
+                        {!isActive && !isSaving && (
+                          <button 
+                            onClick={() => setShowHistory(!showHistory)}
+                            className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em]"
+                          >
+                            <History size={16} />
+                            {showHistory ? "Hide History" : "View Previous Tests"}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto">
+                        <div className="w-full bg-slate-50/50 rounded-[2rem] border border-slate-100 p-6 md:p-8 max-h-[350px] overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-200">
+                          <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 sticky top-0 bg-slate-50/50 py-2 backdrop-blur-sm z-10">
+                            <Sparkles size={12} className="text-indigo-500" />
+                            Live Interview Transcript
+                          </div>
+                          {transcript.map((msg, i) => (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              key={i} 
+                              className={`flex flex-col ${msg.sender === 'You' ? 'items-end' : 'items-start'}`}
+                            >
+                              <span className={`text-[9px] font-black uppercase tracking-wider mb-1 ${msg.sender === 'You' ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                {msg.sender === 'You' ? 'Candidate (You)' : 'IELTS Examiner'}
+                              </span>
+                              <div className={`max-w-[85%] p-4 rounded-2xl text-sm font-medium leading-relaxed text-left ${msg.sender === 'You' ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none shadow-sm'}`}>
+                                {msg.text}
+                              </div>
+                            </motion.div>
+                          ))}
+                          <div ref={transcriptEndRef} />
+                        </div>
+                        <div className="flex flex-col items-center gap-4">
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={stopSession}
+                            className="bg-rose-500 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-rose-100 hover:bg-rose-600 transition-all"
+                          >
+                            <Square size={24} />
+                            End & Save Session
+                          </motion.button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-6">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 1.0 }}
-                      onClick={stopSession}
-                      className="bg-rose-500 text-white px-10 py-5 rounded-2xl font-black text-xl flex items-center gap-3 shadow-2xl shadow-rose-100 hover:bg-rose-600 transition-all"
-                    >
-                      <Square size={24} />
-                      End & Save Session
-                    </motion.button>
-                    <div className="flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-xs">
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></div>
-                      <span>Examiner is Participating...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Transcript Display during session */}
-          {isActive && (
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-100">
-               {transcript.map((msg, i) => (
-                 <motion.div 
-                    initial={{ opacity: 0, x: msg.sender === 'You' ? 20 : -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    key={i} 
-                    className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}
-                 >
-                    <div className={`max-w-[80%] p-4 rounded-2xl text-sm font-medium ${msg.sender === 'You' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
-                      {msg.text}
-                    </div>
-                 </motion.div>
-               ))}
-               {transcript.length === 0 && (
-                 <p className="text-center text-slate-400 font-medium italic">Begin speaking to start the interview...</p>
-               )}
-            </div>
-          )}
-
-          {/* Interview Parts Instructions */}
-          {!isActive && !showHistory && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                { title: "Part 1: Intro", text: "Introduce yourself and talk about your daily routine and hobbies." },
-                { title: "Part 2: Cue Card", text: "Describe a memorable event from your past. You have 1 minute to prepare before you speak for 2 minutes." },
-                { title: "Part 3: Discussion", text: "Compare and contrast your memorable event from Part 2 with a similar event from a different cultural context, encouraging deeper discussion and abstract thinking." }
-              ].map((item, i) => (
-                <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-50 shadow-sm">
-                  <h4 className="font-black text-slate-800 mb-2 uppercase tracking-tight text-sm font-heading">{item.title}</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed font-bold">{item.text}</p>
                 </div>
-              ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!isActive && !showHistory && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <BookOpen size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight font-heading">Practice Mode</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select a category to begin</p>
+                  </div>
+                </div>
+                
+                <div className="flex p-1 bg-slate-100 rounded-2xl">
+                  {(['Part 1', 'Part 2', 'Part 3'] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => generateNewPrompt(cat)}
+                      className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        activePrompt.category === cat 
+                          ? 'bg-white text-indigo-600 shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <motion.div 
+                key={activePrompt.text} 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                className="bg-white p-8 md:p-10 rounded-[2.5rem] border-2 border-indigo-50 shadow-sm relative overflow-hidden group"
+              >
+                <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <MessageSquare size={120} />
+                </div>
+                
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
+                      <Sparkles size={12} />
+                      {activePrompt.category} Focus
+                    </div>
+                    <button 
+                      onClick={() => generateNewPrompt(activePrompt.category)}
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                      title="New Question"
+                    >
+                      <RotateCcw size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-2xl md:text-3xl font-black text-slate-800 leading-tight font-heading max-w-2xl">
+                      "{activePrompt.text}"
+                    </p>
+                    <p className="text-xs text-slate-400 font-bold max-w-lg">
+                      {activePrompt.category === 'Part 1' && "Part 1 questions are usually about everyday topics like work, home, or interests."}
+                      {activePrompt.category === 'Part 2' && "In Part 2, you have to talk about a specific topic for 1-2 minutes. Use your 1 minute prep time wisely."}
+                      {activePrompt.category === 'Part 3' && "Part 3 involves an abstract discussion related to your Part 2 topic."}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
           )}
         </div>
 
-        {/* Previous Sessions (Sidebar/Bottom) */}
         <AnimatePresence>
-          {(showHistory || !isActive) && sessions.length > 0 && (
+          {isSidebarVisible && sessions.length > 0 && (
             <motion.div 
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 20, opacity: 0 }}
-              className="w-full lg:w-96 space-y-6"
+              initial={{ x: 20, opacity: 0, width: 0 }} 
+              animate={{ x: 0, opacity: 1, width: 'auto' }} 
+              exit={{ x: 20, opacity: 0, width: 0 }} 
+              className="w-full lg:w-96 space-y-6 overflow-hidden"
             >
               <div className="flex items-center justify-between px-2">
                 <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2 font-heading">
                   <TrendingUp className="text-indigo-600" size={20} />
                   Session History
                 </h3>
-              </div>
-              
-              <div className="space-y-4">
-                {sessions.map((session) => (
-                  <motion.div 
-                     layoutId={session.id}
-                     key={session.id} 
-                     onClick={() => setSelectedSession(session)}
-                     className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group hover:shadow-md"
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-indigo-600 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600">
-                          <BarChart3 size={18} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(session.date).toLocaleDateString()}</p>
-                          <div className="flex items-center gap-2">
-                             <Award size={14} className="text-amber-500" />
-                             <span className="text-lg font-black text-slate-800 tracking-tight">{session.overallBand} <span className="text-xs opacity-50">/ 9.0</span></span>
-                          </div>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleHistoryAudio(session.id, session.audioBlobId);
-                        }}
-                        className={`p-2.5 rounded-full transition-all transform active:scale-90 ${
-                          playingId === session.id 
-                            ? (isHistoryPlaying ? 'bg-rose-500 text-white shadow-lg shadow-rose-100' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100')
-                            : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white'
-                        }`}
-                      >
-                        {playingId === session.id && isHistoryPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                      </button>
+                    <ArrowUpDown size={14} />
+                    {sortOrder === 'desc' ? 'New' : 'Old'}
+                  </button>
+                  <button 
+                    onClick={() => setIsSidebarVisible(false)}
+                    className="lg:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                {sortedSessions.map((session) => (
+                  <motion.div 
+                    key={session.id} 
+                    onClick={() => setSelectedSession(session)} 
+                    className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group hover:shadow-md relative overflow-hidden active:scale-[0.98]"
+                  >
+                    <div className="bg-indigo-50/50 p-1.5 rounded-lg absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight size={14} className="text-indigo-600" />
                     </div>
-                    {playingId === session.id && (
-                      <div className="space-y-2 mb-4 px-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-1 h-3 items-center">
-                            {[1, 2, 3, 4, 5].map(i => (
-                              <motion.div
-                                key={i}
-                                animate={isHistoryPlaying ? { height: [4, 12, 4] } : { height: 4 }}
-                                transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                                className="w-1 bg-indigo-400 rounded-full"
-                              />
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-mono text-slate-400 font-bold">
-                            {formatTime(playTime)} / {formatTime(duration)}
-                          </span>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <Clock size={10} />
+                          {new Date(session.date).toLocaleDateString()}
+                        </p>
+                        <div className="bg-indigo-600 text-white px-2.5 py-1 rounded-full text-[10px] font-black shadow-sm">
+                          {session.overallBand ? <span>B{session.overallBand}</span> : <span className="opacity-50">-</span>}
                         </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max={duration || 0}
-                          step="0.01"
-                          value={playTime}
-                          onChange={handleSeek}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full h-1 rounded-lg appearance-none cursor-pointer accent-indigo-600 focus:outline-none"
-                          style={{
-                            background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${duration ? (playTime / duration) * 100 : 0}%, #f1f5f9 ${duration ? (playTime / duration) * 100 : 0}%, #f1f5f9 100%)`
-                          }}
-                        />
                       </div>
-                    )}
-                    <p className="text-xs text-slate-500 font-bold leading-relaxed line-clamp-2 italic mb-3">"{session.feedback}"</p>
-                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                       <span className="flex items-center gap-1"><Clock size={10} /> {session.transcript.length} message exchange</span>
-                       <span className="group-hover:text-indigo-600 transition-colors flex items-center gap-1">Details <ChevronRight size={10} /></span>
+                      <div>
+                        <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">AI Summary</div>
+                        <p className="text-xs text-slate-500 font-bold leading-relaxed line-clamp-2 italic mb-3">
+                          "{session.feedback || 'No summary available.'}"
+                        </p>
+                        <div className="flex gap-2">
+                          <button className="flex-1 py-2 bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">
+                            View Report
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -552,131 +820,60 @@ const SpeakingModule: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* Detail Modal */}
       <AnimatePresence>
         {selectedSession && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedSession(null)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            >
-              {/* Header */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedSession(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <div className="flex items-center gap-4">
-                  <div className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-100">
-                    <BarChart3 size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight font-heading">Session Details</h3>
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{new Date(selectedSession.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                  </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight font-heading">Session Details</h3>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{new Date(selectedSession.date).toLocaleDateString()}</p>
                 </div>
-                <button 
-                  onClick={() => setSelectedSession(null)}
-                  className="p-3 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-2xl transition-all border border-slate-100"
-                >
-                  <X size={24} />
-                </button>
+                <button onClick={() => setSelectedSession(null)} className="p-3 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-2xl transition-all border border-slate-100"><X size={24} /></button>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-100">
-                {/* Score and Overview */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-indigo-600 p-8 rounded-[2rem] text-white space-y-2 shadow-xl shadow-indigo-100 flex flex-col justify-center items-center text-center">
+                  <div className="bg-indigo-600 p-8 rounded-[2rem] text-white flex flex-col items-center justify-center text-center shadow-xl shadow-indigo-100">
                     <Award size={40} className="mb-2 text-indigo-200" />
-                    <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80 text-indigo-100">Overall Estimated Band</p>
                     <div className="text-6xl font-black">{selectedSession.overallBand}</div>
-                    <p className="text-sm font-bold opacity-60">Out of 9.0</p>
+                    <p className="text-sm font-bold opacity-60">Overall Band</p>
                   </div>
-                  
-                  <div className="md:col-span-2 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-center gap-2 text-indigo-600 font-black uppercase tracking-widest text-xs">
-                      <TrendingUp size={16} />
-                      <span>Examiner Feedback</span>
-                    </div>
-                    <p className="text-slate-600 font-medium leading-relaxed italic text-lg">
-                      "{selectedSession.feedback}"
-                    </p>
+                  <div className="md:col-span-2 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <p className="text-slate-600 font-medium leading-relaxed italic">"{selectedSession.feedback}"</p>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight font-heading">AI Assessment</h4>
+                  <div className="space-y-3">
+                    {selectedSession.scores && (
+                      <>
+                        <AccordionItem title="Fluency & Coherence" icon={<Clock />} isOpen={openSection === 'F'} onToggle={() => setOpenSection(openSection === 'F' ? null : 'F')}>{selectedSession.scores.fluencyCoherence}</AccordionItem>
+                        <AccordionItem title="Lexical Resource" icon={<BookOpen />} isOpen={openSection === 'L'} onToggle={() => setOpenSection(openSection === 'L' ? null : 'L')}>{selectedSession.scores.lexicalResource}</AccordionItem>
+                        <AccordionItem title="Grammatical Range" icon={<Award />} isOpen={openSection === 'G'} onToggle={() => setOpenSection(openSection === 'G' ? null : 'G')}>{selectedSession.scores.grammaticalRange} </AccordionItem>
+                        <AccordionItem title="Pronunciation" icon={<Volume2 />} isOpen={openSection === 'P'} onToggle={() => setOpenSection(openSection === 'P' ? null : 'P')}>{selectedSession.scores.pronunciation}</AccordionItem>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Transcript Section */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-xs">
-                      <User size={16} />
-                      <span>Full Interview Transcript</span>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{selectedSession.transcript.length} Exchanges</span>
-                  </div>
+                <PronunciationTips />
 
-                  <div className="space-y-4">
-                    {selectedSession.transcript.map((msg, i) => (
-                      <div 
-                        key={i} 
-                        className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div className={`max-w-[85%] space-y-1 ${msg.sender === 'You' ? 'text-right' : 'text-left'}`}>
-                          <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${msg.sender === 'You' ? 'text-indigo-400' : 'text-slate-400'}`}>
-                            {msg.sender === 'You' ? 'Candidate (You)' : 'IELTS Examiner'}
-                          </div>
-                          <div className={`p-4 md:p-5 rounded-2xl text-sm md:text-base font-medium shadow-sm leading-relaxed ${
-                            msg.sender === 'You' 
-                              ? 'bg-indigo-600 text-white rounded-tr-none' 
-                              : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
-                          }`}>
-                            {msg.text}
-                          </div>
+                <div className="space-y-6">
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight font-heading">Full Transcript</h4>
+                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-4">
+                    {selectedSession.transcript?.map((msg: any, i: number) => (
+                      <div key={i} className="flex gap-4">
+                        <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-black text-[10px] ${msg.sender === 'Examiner' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
+                          {msg.sender[0]}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{msg.sender}</p>
+                          <p className="text-sm text-slate-700 leading-relaxed">{msg.text}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              {/* Footer / Actions */}
-              <div className="p-6 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4 order-2 md:order-1">
-                  <button 
-                    onClick={() => toggleHistoryAudio(selectedSession.id, selectedSession.audioBlobId)}
-                    className={`flex items-center gap-3 px-8 py-3.5 rounded-2xl font-black transition-all transform active:scale-95 shadow-lg ${
-                      playingId === selectedSession.id && isHistoryPlaying
-                        ? 'bg-rose-500 text-white shadow-rose-100'
-                        : 'bg-indigo-600 text-white shadow-indigo-100'
-                    }`}
-                  >
-                    {playingId === selectedSession.id && isHistoryPlaying ? (
-                      <><Pause size={20} fill="currentColor" /> Pause Interview Audio</>
-                    ) : (
-                      <><Play size={20} fill="currentColor" /> Play Interview Audio</>
-                    )}
-                  </button>
-                  
-                  {playingId === selectedSession.id && (
-                    <div className="hidden md:flex items-center gap-3 px-4">
-                      <span className="text-xs font-mono text-slate-500 font-bold">{formatTime(playTime)}</span>
-                      <div className="w-24 h-1 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-indigo-600 transition-all duration-300"
-                          style={{ width: `${(playTime / duration) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono text-slate-500 font-bold">{formatTime(duration)}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="order-1 md:order-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recordings are stored locally in your browser</p>
                 </div>
               </div>
             </motion.div>
