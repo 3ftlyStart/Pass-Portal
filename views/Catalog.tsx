@@ -20,6 +20,15 @@ interface Material {
   whatsappTag: string;
 }
 
+interface PastPaper {
+  id: string;
+  title: string;
+  module: 'Academic' | 'General Training';
+  description: string;
+  fileSize: string;
+  downloadUrl: string;
+}
+
 const materials: Material[] = [
   {
     id: '1',
@@ -68,6 +77,41 @@ const materials: Material[] = [
     type: 'pdf',
     category: 'Reading',
     whatsappTag: 'VOCAB_LIST_75'
+  }
+];
+
+const pastPapers: PastPaper[] = [
+  {
+    id: 'acad-p1',
+    title: 'Academic Practice Paper (Full Set V8)',
+    module: 'Academic',
+    description: 'Contains complete Listening, Reading, and Writing sections with answer keys.',
+    fileSize: '3.2 MB',
+    downloadUrl: '#'
+  },
+  {
+    id: 'gen-p1',
+    title: 'General Training Mock Paper (Full Set V8)',
+    module: 'General Training',
+    description: 'Full practice paper designed for immigrations and work visa requirements.',
+    fileSize: '2.8 MB',
+    downloadUrl: '#'
+  },
+  {
+    id: 'acad-p2',
+    title: 'Academic Reading: Practice Set IV',
+    module: 'Academic',
+    description: 'Focused practice on high-difficulty Reading passages and questions.',
+    fileSize: '1.5 MB',
+    downloadUrl: '#'
+  },
+  {
+    id: 'gen-p2',
+    title: 'General Training Writing: Letter Writing Pack',
+    module: 'General Training',
+    description: 'A collection of task 1 letter prompts and high-scoring model answers.',
+    fileSize: '1.2 MB',
+    downloadUrl: '#'
   }
 ];
 
@@ -208,6 +252,71 @@ const Catalog: React.FC = () => {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Past Mock Papers Section */}
+      <div className="space-y-8 pt-12 border-t border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight font-heading">Past Mock Papers</h2>
+            <p className="text-slate-500 font-medium">Download full examination sets for focused practice.</p>
+          </div>
+          <div className="flex gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 self-start">
+            <div className="px-4 py-2 bg-white rounded-xl shadow-sm text-xs font-black text-indigo-600 uppercase tracking-widest border border-slate-100">
+              PDF Library
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {pastPapers.map((paper, idx) => (
+            <motion.div
+              key={paper.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1 }}
+              className="group bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/30 transition-all flex flex-col md:flex-row gap-6 items-start md:items-center"
+            >
+              <div className={`shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-3xl flex items-center justify-center text-white shadow-lg ${
+                paper.module === 'Academic' 
+                ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-indigo-200' 
+                : 'bg-gradient-to-br from-teal-500 to-teal-600 shadow-teal-200'
+              }`}>
+                <FileText size={32} />
+              </div>
+
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
+                    paper.module === 'Academic'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'bg-teal-50 text-teal-600'
+                  }`}>
+                    {paper.module}
+                  </span>
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                    {paper.fileSize}
+                  </span>
+                </div>
+                <h4 className="text-xl font-black text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors font-heading">
+                  {paper.title}
+                </h4>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                  {paper.description}
+                </p>
+              </div>
+
+              <a
+                href={paper.downloadUrl}
+                className="w-full md:w-auto px-6 h-14 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-slate-200"
+              >
+                <Download size={18} />
+                Download
+              </a>
+            </motion.div>
+          ))}
+        </div>
+      </div>
 
       {/* Footer Info */}
       <div className="bg-slate-900 rounded-[2rem] p-8 text-center text-white relative overflow-hidden">

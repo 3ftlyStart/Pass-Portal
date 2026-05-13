@@ -10,7 +10,9 @@ import {
   ChevronRight,
   Zap,
   CreditCard,
-  Wallet
+  Wallet,
+  Gift,
+  Share2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
@@ -143,6 +145,37 @@ const Dashboard: React.FC = () => {
                 Current Plan: <span className="text-white">{profile?.subscriptionTier || 'Free'}</span>
               </p>
             </div>
+          </div>
+        </motion.div>
+
+        {/* Rewards / Referral Card */}
+        <motion.div variants={itemVariants} className="bg-gradient-to-br from-amber-400 to-orange-500 p-6 md:p-8 rounded-3xl shadow-xl shadow-amber-100 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-20 -rotate-12 group-hover:rotate-0 transition-transform duration-700">
+            <Gift size={120} className="text-white" />
+          </div>
+          
+          <div className="relative z-10">
+            <h2 className="text-xl font-black text-white mb-2 font-heading tracking-tight">Refer & Earn</h2>
+            <p className="text-white/80 text-xs font-medium mb-6 leading-relaxed">Earn 10 points for every friend who joins! Redeem points for free credits.</p>
+            
+            <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Your Points</span>
+                <span className="text-xl font-black text-white font-heading">{profile?.points || 0} PTS</span>
+              </div>
+              <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(((profile?.points || 0) / 100) * 100, 100)}%` }}
+                  className="h-full bg-white rounded-full"
+                />
+              </div>
+            </div>
+
+            <Link to="/rewards" className="w-full h-12 flex items-center justify-center gap-2 bg-white text-orange-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-orange-50 transition-all active:scale-95 shadow-lg">
+              <Share2 size={16} />
+              Invite Friends
+            </Link>
           </div>
         </motion.div>
       </div>

@@ -149,25 +149,25 @@ const Pricing: React.FC = () => {
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Speaking</p>
               <div className="flex items-center justify-between">
-                <span className="text-xl font-black text-slate-900 italic">5 <span className="text-xs">CR</span></span>
+                <span className="text-xl font-black text-slate-900">5 <span className="text-xs">CR</span></span>
               </div>
             </div>
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Writing</p>
               <div className="flex items-center justify-between">
-                <span className="text-xl font-black text-slate-900 italic">3 <span className="text-xs">CR</span></span>
+                <span className="text-xl font-black text-slate-900">3 <span className="text-xs">CR</span></span>
               </div>
             </div>
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reading</p>
               <div className="flex items-center justify-between">
-                <span className="text-xl font-black text-slate-900 italic">1 <span className="text-xs">CR</span></span>
+                <span className="text-xl font-black text-slate-900">1 <span className="text-xs">CR</span></span>
               </div>
             </div>
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Listening</p>
               <div className="flex items-center justify-between">
-                <span className="text-xl font-black text-slate-900 italic">1 <span className="text-xs">CR</span></span>
+                <span className="text-xl font-black text-slate-900">1 <span className="text-xs">CR</span></span>
               </div>
             </div>
           </div>

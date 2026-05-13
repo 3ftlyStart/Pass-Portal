@@ -34,6 +34,9 @@
         "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
         "targetScore": { "type": "number" },
         "credits": { "type": "number", "description": "Current credit balance" },
+        "points": { "type": "number", "description": "Reward points balance" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string", "description": "UID of the user who referred this user" },
         "subscriptionTier": { "type": "string", "enum": ["free", "pro", "unlimited"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
@@ -52,6 +55,33 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["amount", "type", "description", "timestamp"]
+    },
+    "Referral": {
+      "title": "Referral Record",
+      "description": "A record of a successful referral.",
+      "type": "object",
+      "properties": {
+        "referrerId": { "type": "string" },
+        "refereeId": { "type": "string" },
+        "refereeName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "pointsAwarded": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["referrerId", "refereeId", "status", "pointsAwarded", "timestamp"]
+    },
+    "RewardRedemption": {
+      "title": "Reward Redemption",
+      "description": "A record of points being redeemed for rewards.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "pointsSpent": { "type": "number" },
+        "rewardType": { "type": "string", "enum": ["credits", "subscription_discount"] },
+        "rewardValue": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "pointsSpent", "rewardType", "rewardValue", "timestamp"]
     }
   },
   "firestore": {
@@ -66,6 +96,14 @@
     "/users/{userId}/transactions/{transactionId}": {
       "schema": "CreditTransaction",
       "description": "User transaction history."
+    },
+    "/referrals/{referralId}": {
+      "schema": "Referral",
+      "description": "Global collection of referrals."
+    },
+    "/redemptions/{redemptionId}": {
+      "schema": "RewardRedemption",
+      "description": "Global collection of point redemptions."
     }
   }
 }

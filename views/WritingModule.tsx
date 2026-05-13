@@ -324,7 +324,7 @@ const WritingModule: React.FC = () => {
                         <div className="bg-white w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-slate-300 group-hover:text-emerald-500 transition-colors shadow-sm shrink-0">
                           {i + 1}
                         </div>
-                        <p className="text-sm text-slate-600 italic leading-relaxed">"{correction}"</p>
+                        <p className="text-sm text-slate-600 leading-relaxed">"{correction}"</p>
                       </div>
                     ))}
                   </div>

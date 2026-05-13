@@ -118,8 +118,20 @@ const Profile: React.FC = () => {
             <h2 className="text-xl font-bold text-slate-800 font-heading">{displayName || 'Anonymous User'}</h2>
             <p className="text-sm text-slate-400 font-medium mb-4">{profile?.email || user.email}</p>
             
-            <div className="inline-flex items-center px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold uppercase tracking-wider mb-8">
               {profile?.role || 'Student'}
+            </div>
+
+            <div className="pt-6 border-t border-slate-50 text-left">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Referral Program</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-700 mb-1">Your Referral Code</p>
+                <p className="text-lg font-black text-indigo-600 tracking-wider mb-2 font-mono">{profile?.referralCode || '-------'}</p>
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                  <span>Balance</span>
+                  <span className="text-amber-600">{profile?.points || 0} Points</span>
+                </div>
+              </div>
             </div>
           </div>
 

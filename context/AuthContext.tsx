@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, query, collection, where, getDocs, writeBatch } from 'firebase/firestore';
 import { auth, db, signInWithGoogle } from '../services/firebase';
 import { UserRole, UserProfile, SubscriptionTier } from '../types';
 
@@ -16,6 +16,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const generateReferralCode = (uid: string) => {
+  return (uid.substring(0, 4) + Math.random().toString(36).substring(2, 6)).toUpperCase();
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -29,11 +33,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Subscribe to profile changes
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         
-        const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+        const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
           if (docSnap.exists()) {
             setProfile({ uid: firebaseUser.uid, ...docSnap.data() } as UserProfile);
           } else {
             // New user, create initial profile
+            const referralCodeFromStorage = localStorage.getItem('referralCode');
+            let referredBy = '';
+            
+            if (referralCodeFromStorage) {
+              try {
+                // Find the referrer
+                const q = query(collection(db, 'users'), where('referralCode', '==', referralCodeFromStorage));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                  const referrerDoc = querySnapshot.docs[0];
+                  referredBy = referrerDoc.id;
+                  
+                  // Award points to referrer (10 points)
+                  const batch = writeBatch(db);
+                  batch.update(doc(db, 'users', referredBy), {
+                    points: (referrerDoc.data().points || 0) + 10
+                  });
+                  
+                  // Create referral record
+                  const refDocRef = doc(collection(db, 'referrals'));
+                  batch.set(refDocRef, {
+                    referrerId: referredBy,
+                    refereeId: firebaseUser.uid,
+                    refereeName: firebaseUser.displayName || 'New User',
+                    status: 'completed',
+                    pointsAwarded: 10,
+                    timestamp: serverTimestamp()
+                  });
+                  
+                  await batch.commit();
+                  localStorage.removeItem('referralCode');
+                }
+              } catch (e) {
+                console.error("Referral processing error:", e);
+              }
+            }
+
             const initialProfile = {
               email: firebaseUser.email || '',
               displayName: firebaseUser.displayName || '',
@@ -41,6 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: 'student' as UserRole,
               targetScore: 7.5,
               credits: 10, // Start with 10 free credits
+              points: 0,
+              referralCode: generateReferralCode(firebaseUser.uid),
+              referredBy: referredBy,
               subscriptionTier: 'free' as SubscriptionTier,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),

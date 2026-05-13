@@ -18,7 +18,8 @@ import {
   Crown,
   Library,
   Zap,
-  Wallet
+  Wallet,
+  Gift
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -50,6 +51,7 @@ const Layout: React.FC = () => {
     { name: 'Listening', path: '/listening', icon: Headphones },
     { name: 'Practice Material', path: '/catalog', icon: Library },
     { name: 'Plans & Pricing', path: '/pricing', icon: Zap },
+    { name: 'Rewards', path: '/rewards', icon: Gift },
     { name: 'Writing', path: '/writing', icon: PenTool },
     { name: 'Speaking', path: '/speaking', icon: Mic2 },
     { name: 'Mock Tests', path: '/mock-tests', icon: GraduationCap },
@@ -142,21 +144,21 @@ const Layout: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+        <header className="min-h-[4rem] md:h-20 py-2 md:py-0 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 flex-wrap gap-2">
+          <div className="flex items-center gap-3 md:gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-base md:text-lg font-bold text-slate-800 truncate max-w-[150px] md:max-w-none font-heading">
+            <h1 className="text-sm md:text-lg font-black text-slate-800 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none font-heading uppercase tracking-wider">
               {navItems.find(n => location.pathname === n.path || (n.path !== '/' && location.pathname.startsWith(n.path)))?.name || 'Portal'}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 relative">
-            <Link to="/pricing" className="relative group">
+          <div className="flex items-center gap-2 md:gap-4 relative ml-auto">
+            <Link to="/pricing" className="relative group shrink-0">
               <motion.div 
                 animate={(profile?.credits || 0) < 10 ? {
                   scale: [1, 1.05, 1],

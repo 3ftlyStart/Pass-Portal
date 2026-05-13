@@ -24,7 +24,8 @@ import {
   MessageSquare,
   ArrowUpDown,
   Filter,
-  Library
+  Library,
+  Calendar
 } from 'lucide-react';
 import { auth, db } from '../services/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -572,7 +573,7 @@ const SpeakingModule = () => {
                     </div>
                     <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/10 max-w-sm">
                       <p className="text-xs text-indigo-200 mb-2 font-bold uppercase tracking-wider text-center md:text-left">Examiner Summary</p>
-                      <p className="text-sm font-medium leading-relaxed italic">
+                      <p className="text-sm font-medium leading-relaxed">
                         "{feedback.feedback}"
                       </p>
                     </div>
@@ -796,6 +797,109 @@ const SpeakingModule = () => {
             )}
           </AnimatePresence>
 
+          {!isActive && showHistory && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100">
+                    <History size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-800 tracking-tight font-heading">Practice History</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Review your past performance and growth</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowHistory(false)}
+                  className="bg-white border border-slate-100 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm flex items-center gap-2 group"
+                >
+                  <Bot size={16} className="group-hover:rotate-12 transition-transform" />
+                  Back to Speaking Lab
+                </button>
+              </div>
+
+              {sessions.length === 0 ? (
+                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] p-20 text-center space-y-6">
+                  <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto text-slate-300 shadow-sm">
+                    <Clock size={40} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-slate-800 font-black text-xl">No Sessions Found</p>
+                    <p className="text-slate-500 font-medium max-w-xs mx-auto">Complete your first AI mock interview to start building your history.</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowHistory(false)}
+                    className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                  >
+                    Start a Session
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+                  {sortedSessions.map((session, idx) => (
+                    <motion.div
+                      key={session.id || idx}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
+                      onClick={() => setSelectedSession(session)}
+                      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-indigo-200 transition-all cursor-pointer group hover:shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[320px]"
+                    >
+                      {/* Background accent */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/30 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-indigo-100/50 transition-colors" />
+                      
+                      <div>
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                              <Calendar size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Session Date</span>
+                              <span className="text-sm font-black text-slate-800">
+                                {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Score</span>
+                            <div className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-xs font-black shadow-lg shadow-indigo-100 ring-4 ring-indigo-50">
+                              {session.overallBand?.toFixed(1) || '-'} Band
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 relative z-10">
+                          <div className="flex items-center gap-2 text-indigo-500">
+                            <Sparkles size={14} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Examiner Summary</span>
+                          </div>
+                          <p className="text-sm text-slate-600 font-medium leading-relaxed line-clamp-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 group-hover:bg-indigo-50/30 group-hover:border-indigo-100/50 transition-all">
+                            "{session.feedback || 'No summary available for this practice session.'}"
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-50 relative z-10">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <MessageSquare size={14} className="text-slate-300" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">
+                              {session.transcript?.length || 0} Messages
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-xs font-black text-indigo-600 group-hover:translate-x-1 transition-transform flex items-center gap-2 uppercase tracking-widest bg-indigo-50 px-4 py-2 rounded-xl group-hover:bg-indigo-600 group-hover:text-white">
+                          View Details <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {!isActive && !showHistory && (
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
@@ -916,7 +1020,7 @@ const SpeakingModule = () => {
         </div>
 
         <AnimatePresence>
-          {isSidebarVisible && sessions.length > 0 && (
+          {isSidebarVisible && sessions.length > 0 && !showHistory && (
             <motion.div 
               initial={{ x: 20, opacity: 0, width: 0 }} 
               animate={{ x: 0, opacity: 1, width: 'auto' }} 
@@ -966,7 +1070,7 @@ const SpeakingModule = () => {
                       </div>
                       <div>
                         <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">AI Summary</div>
-                        <p className="text-xs text-slate-500 font-bold leading-relaxed line-clamp-2 italic mb-3">
+                        <p className="text-xs text-slate-500 font-bold leading-relaxed line-clamp-2 mb-3">
                           "{session.feedback || 'No summary available.'}"
                         </p>
                         <div className="flex gap-2">
@@ -1004,7 +1108,7 @@ const SpeakingModule = () => {
                     <p className="text-sm font-bold opacity-60">Overall Band</p>
                   </div>
                   <div className="md:col-span-2 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <p className="text-slate-600 font-medium leading-relaxed italic">"{selectedSession.feedback}"</p>
+                    <p className="text-slate-600 font-medium leading-relaxed">"{selectedSession.feedback}"</p>
                   </div>
                 </div>
                 <div className="space-y-6">

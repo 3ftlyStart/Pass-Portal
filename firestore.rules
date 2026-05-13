@@ -50,6 +50,9 @@ service cloud.firestore {
           && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 2000)
           && (data.get('targetScore', 7.5) is number && data.get('targetScore', 7.5) >= 0 && data.get('targetScore', 7.5) <= 9)
           && (data.get('credits', 0) is number && data.get('credits', 0) >= 0)
+          && (data.get('points', 0) is number && data.get('points', 0) >= 0)
+          && (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 20)
+          && (data.get('referredBy', '') is string && data.get('referredBy', '').size() <= 128)
           && (data.get('subscriptionTier', 'free') in ['free', 'pro', 'unlimited']);
     }
 
@@ -81,7 +84,7 @@ service cloud.firestore {
 
       allow update: if (isOwner(userId) && (
                       // Strict update path for students - cannot change their own role
-                      incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'targetScore', 'updatedAt', 'credits', 'subscriptionTier'])
+                      incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'targetScore', 'updatedAt', 'credits', 'subscriptionTier', 'points', 'referralCode', 'referredBy'])
                       && (incoming().get('updatedAt', request.time) == request.time)
                       && (incoming().role == existing().role)
                       && isValidUser(incoming())
@@ -113,6 +116,21 @@ service cloud.firestore {
 
         allow delete: if isOwner(userId) || isAdmin();
       }
+    }
+
+    // --- Global Reward Collections ---
+
+    match /referrals/{refId} {
+      allow get: if isSignedIn() && (isOwner(resource.data.referrerId) || isOwner(resource.data.refereeId) || isAdmin());
+      allow list: if isSignedIn() && (isOwner(request.resource.data.referrerId) || isAdmin() || (request.query.limit <= 100 && resource.data.referrerId == request.auth.uid));
+      allow create: if isSignedIn() && incoming().refereeId == request.auth.uid && isValidId(refId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /redemptions/{redId} {
+      allow get, list: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isSignedIn() && isOwner(incoming().userId) && isValidId(redId);
+      allow update, delete: if isAdmin();
     }
   }
 }

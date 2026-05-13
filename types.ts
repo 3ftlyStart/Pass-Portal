@@ -17,9 +17,31 @@ export interface UserProfile {
   role: UserRole;
   targetScore?: number;
   credits: number;
+  points: number;
+  referralCode?: string;
+  referredBy?: string;
   subscriptionTier: SubscriptionTier;
   createdAt: any;
   updatedAt: any;
+}
+
+export interface Referral {
+  id: string;
+  referrerId: string;
+  refereeId: string;
+  refereeName: string;
+  status: 'pending' | 'completed';
+  pointsAwarded: number;
+  timestamp: any;
+}
+
+export interface RewardRedemption {
+  id: string;
+  userId: string;
+  pointsSpent: number;
+  rewardType: 'credits' | 'subscription_discount';
+  rewardValue: number;
+  timestamp: any;
 }
 
 export interface CreditTransaction {
